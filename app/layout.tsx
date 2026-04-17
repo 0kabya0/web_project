@@ -1,28 +1,47 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, ClipboardList, Utensils, ShoppingCart, 
-  Wallet, User, FileText 
+  Wallet, User, FileText, LogOut, ChevronDown,
+  Users, Settings // Added icons for the new sections
 } from "lucide-react";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [userData, setUserData] = useState({ username: "Guest" });
 
-  // Robust check: hides sidebar if the path is exactly "/" or "/login"
-  // The .replace(/\/$/, "") handles cases where there is a trailing slash
+  // Load user data from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("mess_user");
+    if (saved) {
+      setUserData(JSON.parse(saved));
+    }
+  }, [pathname]);
+
   const isLoginPage = pathname === "/" || pathname === "" || pathname?.includes('/login');
 
+  const handleLogout = () => {
+    localStorage.removeItem("mess_user"); // Clear session
+    router.push("/"); // Redirect to login
+  };
+
   const sidebarItems = [
-    { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard" },
-    { icon: <ClipboardList size={20} />, label: "Summary", href: "/summary" },
-    { icon: <Utensils size={20} />, label: "Meals", href: "/meals" },
-    { icon: <ShoppingCart size={20} />, label: "Bazar", href: "/bazar" },
-    { icon: <Wallet size={20} />, label: "Payments", href: "/payments" },
-    { icon: <User size={20} />, label: "My Profile", href: "/profile" },
-    { icon: <FileText size={20} />, label: "Reports", href: "/reports" },
+    { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard", roles: ['admin', 'user'] },
+    { icon: <ClipboardList size={20} />, label: "Summary", href: "/summary", roles: ['admin', 'user'] },
+    { icon: <Utensils size={20} />, label: "Meals", href: "/meals", roles: ['admin', 'user'] },
+    { icon: <ShoppingCart size={20} />, label: "Bazar", href: "/bazar", roles: ['admin', 'user'] },
+    { icon: <Wallet size={20} />, label: "Payments", href: "/payments", roles: ['admin', 'user'] },
+    { icon: <Users size={20} />, label: "Members", href: "/members", roles: ['admin'] },
+    { icon: <Settings size={20} />, label: "Manage Mess", href: "/managemess", roles: ['admin'] },
+    { icon: <User size={20} />, label: "My Profile", href: "/profile", roles: ['admin', 'user'] },
+    { icon: <FileText size={20} />, label: "Reports", href: "/reports", roles: ['admin'] },
   ];
+
+  const filteredSidebarItems = sidebarItems.filter(item => item.roles.includes(userData.role || 'user'));
 
   return (
     <html lang="en">
@@ -38,17 +57,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             border: 1px solid rgba(59, 130, 246, 0.5) !important;
             cursor: pointer;
           }
+          .logout-item:hover {
+            background: rgba(239, 68, 68, 0.1) !important;
+            color: #ef4444 !important;
+          }
+          /* Custom Scrollbar for Sidebar */
+          .sidebar-nav::-webkit-scrollbar {
+            width: 4px;
+          }
+          .sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+          }
         `}</style>
 
-        {/* This block ONLY renders if it's NOT the login page */}
         {!isLoginPage && (
           <aside style={styles.sidebar}>
             <div style={styles.logoSection}>
               <div style={styles.logoIcon}>🏠</div>
               <h2 style={styles.logoText}>MESS MASTER</h2>
             </div>
-            <nav style={styles.nav}>
-              {sidebarItems.map((item, index) => {
+            <nav style={styles.nav} className="sidebar-nav">
+              {filteredSidebarItems.map((item, index) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link href={item.href} key={index} style={{ textDecoration: 'none' }}>
@@ -62,11 +92,40 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </aside>
         )}
 
-        {/* Main content expands to full width if it's the login page */}
         <main style={{ 
           ...styles.mainContent, 
           ...(isLoginPage ? styles.authMainContent : {}) 
         }}>
+          {/* TOP RIGHT USER BOX */}
+          {!isLoginPage && (
+            <div style={styles.topRightActions}>
+              <div 
+                style={styles.userDropdownTrigger} 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              >
+                <div style={styles.avatar}>
+                  {userData.username.charAt(0).toUpperCase()}
+                </div>
+                <span style={styles.username}>{userData.username}</span>
+                <ChevronDown size={16} color="#94a3b8" />
+
+                {/* DROPDOWN MENU */}
+                {isDropdownOpen && (
+                  <div style={styles.dropdownMenu}>
+                    <div 
+                      className="logout-item" 
+                      style={styles.dropdownItem} 
+                      onClick={handleLogout}
+                    >
+                      <LogOut size={16} />
+                      <span>Logout</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {children}
         </main>
       </body>
@@ -97,15 +156,81 @@ const styles: { [key: string]: React.CSSProperties } = {
   logoSection: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "40px", padding: "10px" },
   logoIcon: { background: "#3b82f6", width: "32px", height: "32px", borderRadius: "8px", display: "flex", justifyContent: "center", alignItems: "center" },
   logoText: { fontSize: "18px", fontWeight: "bold", margin: 0 },
-  nav: { flex: 1, display: "flex", flexDirection: "column", gap: "8px" },
+  nav: { 
+    flex: 1, 
+    display: "flex", 
+    flexDirection: "column", 
+    gap: "8px",
+    overflowY: "auto",
+    paddingRight: "5px"
+  },
   navItem: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", borderRadius: "12px", color: "#94a3b8", transition: "0.3s" },
   navItemActive: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", borderRadius: "12px", background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", fontWeight: "600" },
+  
   mainContent: { 
     flex: 1, 
     padding: "40px", 
     overflowY: "auto",
     position: "relative"
   },
+
+  topRightActions: {
+    position: "absolute",
+    top: "30px",
+    right: "40px",
+    zIndex: 100,
+  },
+  userDropdownTrigger: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    background: "rgba(255, 255, 255, 0.05)",
+    padding: "8px 16px",
+    borderRadius: "30px",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    cursor: "pointer",
+    position: "relative",
+  },
+  avatar: {
+    width: "32px",
+    height: "32px",
+    background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
+    borderRadius: "50%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    fontWeight: "bold",
+    fontSize: "14px",
+    color: "#fff"
+  },
+  username: {
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#f8fafc"
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: "50px",
+    right: "0",
+    width: "150px",
+    background: "#0f172a",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    borderRadius: "12px",
+    boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+    overflow: "hidden",
+    padding: "5px"
+  },
+  dropdownItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "10px 15px",
+    color: "#94a3b8",
+    fontSize: "14px",
+    borderRadius: "8px",
+    transition: "0.2s"
+  },
+
   authMainContent: { 
     padding: "0px", 
     display: "flex", 

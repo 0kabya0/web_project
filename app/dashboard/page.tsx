@@ -49,8 +49,8 @@ export default function Dashboard() {
         }
       `}</style>
 
-      {/* Sidebar removed so it doesn't double up with the layout */}
       <main style={styles.mainContent}>
+        {/* UPDATED HEADER: User profile box removed */}
         <header style={styles.header}>
           <div>
             <h1 style={styles.welcomeText}>
@@ -59,10 +59,6 @@ export default function Dashboard() {
             <p style={styles.subText}>
               {isLastDay ? "Month-end calculation is ready." : "Next calculation: Last day of the month."}
             </p>
-          </div>
-          <div style={styles.userProfile} className="move-card">
-            <div style={styles.avatar}>{userData.username.charAt(0).toUpperCase()}</div>
-            <span>{userData.username}</span>
           </div>
         </header>
 
@@ -129,11 +125,9 @@ function StatCard({ title, value, icon }: { title: string, value: string, icon: 
 const styles: { [key: string]: React.CSSProperties } = {
   container: { display: "flex", background: "transparent", color: "#f8fafc", fontFamily: "'Inter', sans-serif" },
   mainContent: { flex: 1, padding: "20px", overflowY: "auto" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" },
+  header: { display: "flex", justifyContent: "flex-start", alignItems: "center", marginBottom: "30px" },
   welcomeText: { fontSize: "28px", fontWeight: "bold", margin: 0 },
   subText: { color: "#94a3b8", margin: "5px 0 0 0" },
-  userProfile: { display: "flex", alignItems: "center", gap: "12px", background: "rgba(255,255,255,0.05)", padding: "8px 16px", borderRadius: "30px", border: "1px solid transparent" },
-  avatar: { width: "32px", height: "32px", background: "#475569", borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center", fontWeight: "bold" },
   banner: { background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)", padding: "24px", borderRadius: "20px", marginBottom: "20px" },
   bannerInfo: { display: "flex", alignItems: "center", gap: "16px" },
   bannerIcon: { background: "rgba(255,255,255,0.2)", padding: "12px", borderRadius: "14px" },

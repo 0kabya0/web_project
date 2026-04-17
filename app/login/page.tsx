@@ -1,90 +1,68 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Home, User, Lock, Mail, ShieldCheck, Users, Key, ArrowRight, LogIn } from "lucide-react"; 
+import { Home, User, Lock, Mail, LogIn } from "lucide-react";
 
 export default function SignupPage() {
-  const [step, setStep] = useState(1); 
-  const [role, setRole] = useState("other"); 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState("");
   const router = useRouter();
 
-  const ADMIN_CREDS = {
-    username: "Admin",
-    password: "123",
-    email: "admin@gmail.com"
-  };
-
   // --- FRONTEND LOGIC: LOGIN ---
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 1. Priority Check: Admin access
-    if (userId === ADMIN_CREDS.username && password === ADMIN_CREDS.password) {
-        localStorage.setItem("mess_user", JSON.stringify({ 
-            username: userId, 
-            role: "admin", 
-            isNew: false 
-        }));
-        router.push("/dashboard");
-        return; 
-    }
 
-    // 2. Regular User check from LocalStorage
-    const savedData = localStorage.getItem("mess_user");
-    if (!savedData) {
-      alert("No account found! Please Sign Up first.");
-      return;
-    }
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: userId, password }),
+      });
 
-    const user = JSON.parse(savedData);
-    if (user.username === userId && user.password === password) {
-      localStorage.setItem("mess_user", JSON.stringify({ 
-        ...user, isNew: false 
-      }));
-      alert(`Welcome back, ${user.username}!`);
-      router.push("/dashboard");
-    } else {
-      alert("Invalid Username or Password.");
-    }
-  };
+      const data = await res.json();
 
-  // --- FRONTEND LOGIC: SIGNUP (OTP STEP) ---
-  const handleAction = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (role === "admin") {
-      // Direct login for admin role during signup attempt
-      if (userId === ADMIN_CREDS.username && password === ADMIN_CREDS.password) {
-        localStorage.setItem("mess_user", JSON.stringify({ 
-            username: userId, role: "admin", email: ADMIN_CREDS.email, isNew: false 
-        }));
+      if (res.ok) {
+        localStorage.setItem("mess_user", JSON.stringify(data.user));
+        alert(`Welcome back, ${data.user.username}!`);
         router.push("/dashboard");
       } else {
-        alert("Invalid Admin Credentials!");
+        alert(data.error || 'Login failed');
       }
-      return;
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login failed');
     }
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(code);
-    setStep(2);
-    alert(`[MESS MASTER] Verification code sent to ${email}\n\nYOUR CODE: ${code}`);
   };
 
-  // --- FRONTEND LOGIC: OTP VERIFICATION ---
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  // --- FRONTEND LOGIC: SIGNUP (DIRECT) ---
+  const handleAction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp === generatedOtp) {
-      localStorage.setItem("mess_user", JSON.stringify({ 
-          username: userId, email: email, role: "other", password: password, isNew: true 
-      }));
-      router.push("/dashboard");
-    } else {
-      alert("Wrong OTP!");
+
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: userId,
+          email,
+          password,
+          role: 'user'
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert('Signup successful! Your account is pending admin approval.');
+        setIsLoggingIn(true);
+      } else {
+        alert(data.error || 'Signup failed');
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      alert('Signup failed');
     }
   };
 
@@ -125,7 +103,7 @@ export default function SignupPage() {
           </div>
           <h1 style={styles.appName}>MESS MASTER</h1>
           <p style={styles.subtitle}>
-            {isLoggingIn ? "Secure Login" : (step === 1 ? "System Access" : "Verify Email")}
+            {isLoggingIn ? "Secure Login" : "Create Account"}
           </p>
         </div>
 
@@ -143,40 +121,21 @@ export default function SignupPage() {
             </div>
           </form>
         ) : (
-          step === 1 ? (
-            <form onSubmit={handleAction} style={styles.form}>
-              <div style={styles.roleContainer}>
-                <button type="button" onClick={() => setRole("admin")} style={role === "admin" ? styles.activeRole : styles.inactiveRole}><ShieldCheck size={16}/> Admin</button>
-                <button type="button" onClick={() => setRole("other")} style={role === "other" ? styles.activeRole : styles.inactiveRole}><Users size={16}/> Other</button>
-              </div>
-              <div style={styles.inputWrapper}>
-                <User style={styles.fieldIcon} size={20}/><input type="text" placeholder="Username" style={styles.input} value={userId} onChange={(e)=>setUserId(e.target.value)} required />
-              </div>
-              {role === "other" && (
-                <div style={styles.inputWrapper}>
-                  <Mail style={styles.fieldIcon} size={20}/><input type="email" placeholder="Gmail Address" style={styles.input} value={email} onChange={(e)=>setEmail(e.target.value)} required />
-                </div>
-              )}
-              <div style={styles.inputWrapper}>
-                <Lock style={styles.fieldIcon} size={20}/><input type="password" placeholder="Password" style={styles.input} value={password} onChange={(e)=>setPassword(e.target.value)} required />
-              </div>
-              <button type="submit" style={styles.button} className="btn-hover">
-                {role === "admin" ? "Login as Admin" : "Send OTP"} <ArrowRight size={18} />
-              </button>
-              <div style={styles.footerText}>
-                Already have an account? <button type="button" onClick={() => setIsLoggingIn(true)} style={styles.textLink}>Sign In</button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} style={styles.form}>
-              <p style={styles.otpText}>Enter code sent to <b>{email}</b></p>
-              <div style={styles.inputWrapper}>
-                <Key style={styles.fieldIcon} size={20}/><input type="text" placeholder="6-Digit OTP" style={styles.input} value={otp} onChange={(e)=>setOtp(e.target.value)} required />
-              </div>
-              <button type="submit" style={styles.button} className="btn-hover">Verify & Continue</button>
-              <button type="button" onClick={() => setStep(1)} style={styles.backBtn}>Back to Signup</button>
-            </form>
-          )
+          <form onSubmit={handleAction} style={styles.form}>
+            <div style={styles.inputWrapper}>
+              <User style={styles.fieldIcon} size={20}/><input type="text" placeholder="Username" style={styles.input} value={userId} onChange={(e)=>setUserId(e.target.value)} required />
+            </div>
+            <div style={styles.inputWrapper}>
+              <Mail style={styles.fieldIcon} size={20}/><input type="email" placeholder="Email" style={styles.input} value={email} onChange={(e)=>setEmail(e.target.value)} required />
+            </div>
+            <div style={styles.inputWrapper}>
+              <Lock style={styles.fieldIcon} size={20}/><input type="password" placeholder="Password" style={styles.input} value={password} onChange={(e)=>setPassword(e.target.value)} required />
+            </div>
+            <button type="submit" style={styles.button} className="btn-hover">Sign Up <LogIn size={18} /></button>
+            <div style={styles.footerText}>
+               Already have an account? <button type="button" onClick={() => setIsLoggingIn(true)} style={styles.textLink}>Sign In</button>
+            </div>
+          </form>
         )}
       </div>
     </div>
