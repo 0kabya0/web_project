@@ -1,38 +1,146 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Users, Utensils, ShoppingCart, TrendingUp, ArrowUpRight, User 
 } from "lucide-react";
+import { useGlobalStats } from "@/hooks/useGlobalStats";
 
 export default function Dashboard() {
   const [userData, setUserData] = useState({ username: "Guest", role: "other", isNew: false });
+  const [rentBill, setRentBill] = useState({ roomRent: 0, wifiBill: 0, buaBill: 0 });
+  const [members, setMembers] = useState<Array<{ _id: string }>>([]);
+  const [meals, setMeals] = useState<Array<{ memberId: { _id: string } | string | null; total: number }>>([]);
+  const [bazars, setBazars] = useState<Array<{ memberId: { _id?: string } | string | null; total?: number; quantity?: number; price?: number }>>([]);
+  const [payments, setPayments] = useState<Array<{ memberId: { _id?: string } | string | null; amount?: number }>>([]);
+  const { stats } = useGlobalStats();
 
   useEffect(() => {
     const saved = localStorage.getItem("mess_user");
     if (saved) {
       setUserData(JSON.parse(saved));
     }
+
+    const fetchDashboardData = async () => {
+      try {
+        const monthKey = new Date().toISOString().slice(0, 7);
+        const [rentRes, membersRes, mealsRes, bazarsRes, paymentsRes] = await Promise.all([
+          fetch(`/api/rent?month=${monthKey}`),
+          fetch("/api/members"),
+          fetch("/api/meals"),
+          fetch("/api/bazar"),
+          fetch("/api/payments"),
+        ]);
+
+        if (rentRes.ok) {
+          const data = await rentRes.json();
+          if (data) {
+            setRentBill({
+              roomRent: Number(data.roomRent || 0),
+              wifiBill: Number(data.wifiBill || 0),
+              buaBill: Number(data.buaBill || 0),
+            });
+          }
+        }
+
+        if (membersRes.ok) {
+          const data = await membersRes.json();
+          setMembers(Array.isArray(data) ? data : []);
+        }
+        if (mealsRes.ok) {
+          const data = await mealsRes.json();
+          setMeals(Array.isArray(data) ? data : []);
+        }
+        if (bazarsRes.ok) {
+          const data = await bazarsRes.json();
+          setBazars(Array.isArray(data) ? data : []);
+        }
+        if (paymentsRes.ok) {
+          const data = await paymentsRes.json();
+          setPayments(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      }
+    };
+
+    fetchDashboardData();
   }, []);
 
   // --- GLOBAL STATS ---
-  const totalMembers = userData.role === "admin" ? 1 : 27; 
-  const totalBazar = 0;
-  const totalMeals = 0;
+  const totalMembers = stats.totalMembers;
+  const totalBazar = stats.totalBazar;
+  const totalMeals = stats.totalMeals;
   const mealRate = totalMeals > 0 ? (totalBazar / totalMeals).toFixed(2) : "0.00";
 
   // --- PERSONAL ACCOUNTING ---
-  const myMeals = 0; 
-  const myPaid = 0;   
-  const fixedBills = 2150 + 180 + 450; 
+  const totalRent = rentBill.roomRent + rentBill.wifiBill + rentBill.buaBill;
+
+  const getIdFromRef = (ref: { _id?: string } | string | null | undefined): string => {
+    if (!ref) return "";
+    if (typeof ref === "string") return ref;
+    return ref._id || "";
+  };
+
+  const mealsByMember = useMemo(() => {
+    return meals.reduce((acc, meal) => {
+      const memberId = getIdFromRef(meal.memberId as { _id?: string } | string | null);
+      if (!memberId) return acc;
+      acc[memberId] = (acc[memberId] || 0) + Number(meal.total || 0);
+      return acc;
+    }, {} as Record<string, number>);
+  }, [meals]);
+
+  const bazarsByMember = useMemo(() => {
+    return bazars.reduce((acc, bazar) => {
+      const memberId = getIdFromRef(bazar.memberId);
+      if (!memberId) return acc;
+      const amount = typeof bazar.total === "number"
+        ? bazar.total
+        : Number(bazar.quantity || 0) * Number(bazar.price || 0);
+      acc[memberId] = (acc[memberId] || 0) + amount;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [bazars]);
+
+  const paidMemberIds = useMemo(() => {
+    const ids = new Set<string>();
+    payments.forEach((payment) => {
+      const memberId = getIdFromRef(payment.memberId);
+      if (memberId) ids.add(memberId);
+    });
+    return ids;
+  }, [payments]);
+
+  const getMemberBalance = (memberId: string): number => {
+    const mealCost = (mealsByMember[memberId] || 0) * stats.mealRate;
+    const giveTake = mealCost - (bazarsByMember[memberId] || 0);
+    return totalRent + giveTake;
+  };
+
+  const currentMember = members.find((member) => member._id && member._id === (userData as any)._id)
+    || members.find((member) => member._id && (userData.username || "").toLowerCase() === (member as any).username?.toLowerCase());
+
+  const currentMemberId = currentMember?._id || "";
+  const currentMemberBalance = currentMemberId ? getMemberBalance(currentMemberId) : 0;
+  const currentMemberPaid = currentMemberId
+    ? payments.reduce((sum, payment) => {
+        const paymentMemberId = getIdFromRef(payment.memberId);
+        if (paymentMemberId !== currentMemberId) return sum;
+        return sum + Number(payment.amount || 0);
+      }, 0)
+    : 0;
+  const currentMemberHasPaid = currentMemberId ? currentMemberBalance <= 0 || currentMemberPaid >= currentMemberBalance : false;
+
+  const myPaid = useMemo(() => {
+    return members
+      .filter((member) => paidMemberIds.has(member._id))
+      .reduce((sum, member) => sum + getMemberBalance(member._id), 0);
+  }, [members, paidMemberIds, mealsByMember, bazarsByMember, stats.mealRate, totalRent]);
   
   const today = new Date();
   const nextDay = new Date(today);
   nextDay.setDate(today.getDate() + 1);
   const isLastDay = nextDay.getMonth() !== today.getMonth();
-
-  const myExpense = isLastDay && myMeals > 0 
-    ? (parseFloat(mealRate) * myMeals) + fixedBills 
-    : 0; 
 
   return (
     <div style={styles.container}>
@@ -68,7 +176,7 @@ export default function Dashboard() {
             <div>
               <p style={{ margin: 0, fontSize: "12px", opacity: 0.8 }}>Current Manager</p>
               <h3 style={{ margin: 0 }}>
-                {userData.role === "admin" ? userData.username : "Mahmudul Hassan Abin"}
+                {userData.role === "admin" ? userData.username : "Admin"}
               </h3>
             </div>
           </div>
@@ -78,19 +186,34 @@ export default function Dashboard() {
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", gap: "80px" }}>
               <div>
-                <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>My Expenses</p>
+                <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Total Rent</p>
                 <h2 style={{ fontSize: "36px", fontWeight: "bold", margin: "8px 0", color: "#f8fafc" }}>
-                  ৳{myExpense.toLocaleString()}
+                  ৳{totalRent.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </h2>
-                {!isLastDay && <span style={{fontSize: '11px', color: '#6366f1'}}>Calculates on month-end</span>}
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>Room Rent: ৳{rentBill.roomRent.toFixed(2)}</span>
+                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>Wifi Bill: ৳{rentBill.wifiBill.toFixed(2)}</span>
+                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>Rannar Maasi/Bua: ৳{rentBill.buaBill.toFixed(2)}</span>
+                </div>
               </div>
-              
-              <div>
-                <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Total Paid</p>
-                <h2 style={{ fontSize: "36px", fontWeight: "bold", margin: "8px 0", color: "#10b981" }}>
-                  ৳{myPaid.toLocaleString()}
-                </h2>
-              </div>
+              {userData.role === "admin" ? (
+                <div>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Total Paid</p>
+                  <h2 style={{ fontSize: "36px", fontWeight: "bold", margin: "8px 0", color: "#10b981" }}>
+                    ৳{myPaid.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </h2>
+                </div>
+              ) : (
+                <div style={{ maxWidth: "320px", textAlign: "left" }}>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Payment Status</p>
+                  <h2 style={{ fontSize: "22px", fontWeight: "800", margin: "8px 0", color: currentMemberHasPaid ? "#10b981" : "#f59e0b" }}>
+                    {currentMemberHasPaid ? "Thank you for your monthly payment." : `Your monthly balance is ৳${currentMemberBalance.toFixed(2)}`}
+                  </h2>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#cbd5e1" }}>
+                    {currentMemberHasPaid ? "Your balance is already cleared." : "Please clear your balance when possible."}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           

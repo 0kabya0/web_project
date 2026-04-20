@@ -5,3 +5,4 @@ export { default as Meal } from './Meal';
 export { default as Bazar } from './Bazar';
 export { default as Payment } from './Payment';
 export { default as Summary } from './Summary';
+export { default as RentBill } from './RentBill';

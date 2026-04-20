@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Users, Utensils, ShoppingCart, TrendingUp, ClipboardList } from "lucide-react";
+import { useGlobalStats } from "@/hooks/useGlobalStats";
 
 interface Member {
   _id: string;
@@ -9,9 +10,33 @@ interface Member {
   role?: string;
 }
 
+interface MealRecord {
+  _id: string;
+  memberId: { _id: string };
+  total: number;
+}
+
+interface BazarRecord {
+  _id: string;
+  memberId: string | { _id?: string };
+  total?: number;
+  quantity?: number;
+  price?: number;
+}
+
+interface RentBill {
+  roomRent?: number;
+  wifiBill?: number;
+  buaBill?: number;
+}
+
 export default function SummaryPage() {
   const [members, setMembers] = useState<Member[]>([]);
+  const [meals, setMeals] = useState<MealRecord[]>([]);
+  const [bazars, setBazars] = useState<BazarRecord[]>([]);
+  const [totalRent, setTotalRent] = useState(0);
   const [loading, setLoading] = useState(true);
+  const { stats } = useGlobalStats();
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -45,8 +70,111 @@ export default function SummaryPage() {
         setLoading(false);
       }
     };
+
+    const fetchMeals = async () => {
+      try {
+        const res = await fetch("/api/meals");
+        if (res.ok) {
+          const data = await res.json();
+          setMeals(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Error fetching meals:", err);
+      }
+    };
+
+    const fetchBazars = async () => {
+      try {
+        const res = await fetch("/api/bazar");
+        if (res.ok) {
+          const data = await res.json();
+          setBazars(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Error fetching bazars:", err);
+      }
+    };
+
+    const fetchRentBill = async () => {
+      try {
+        const monthKey = new Date().toISOString().slice(0, 7);
+        const monthRes = await fetch(`/api/rent?month=${monthKey}`);
+        if (monthRes.ok) {
+          const monthData = (await monthRes.json()) as RentBill | null;
+          if (monthData) {
+            const rent = Number(monthData.roomRent || 0) + Number(monthData.wifiBill || 0) + Number(monthData.buaBill || 0);
+            setTotalRent(rent);
+            return;
+          }
+        }
+
+        const latestRes = await fetch("/api/rent");
+        if (latestRes.ok) {
+          const latestData = (await latestRes.json()) as RentBill | null;
+          const rent = latestData
+            ? Number(latestData.roomRent || 0) + Number(latestData.wifiBill || 0) + Number(latestData.buaBill || 0)
+            : 0;
+          setTotalRent(rent);
+        }
+      } catch (err) {
+        console.error("Error fetching rent bill:", err);
+      }
+    };
+
     fetchMembers();
+    fetchMeals();
+    fetchBazars();
+    fetchRentBill();
   }, []);
+
+  const mealsByMember = meals.reduce((acc, meal) => {
+    const memberId = meal.memberId?._id;
+    if (!memberId) return acc;
+    acc[memberId] = (acc[memberId] || 0) + (meal.total || 0);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const getRecordMemberId = (memberRef: BazarRecord["memberId"]): string => {
+    if (typeof memberRef === "string") return memberRef;
+    return memberRef?._id || "";
+  };
+
+  const getBazarAmount = (bazar: BazarRecord): number => {
+    if (typeof bazar.total === "number" && Number.isFinite(bazar.total)) {
+      return bazar.total;
+    }
+    const quantity = Number(bazar.quantity || 0);
+    const price = Number(bazar.price || 0);
+    return quantity * price;
+  };
+
+  const bazarsByMember = bazars.reduce((acc, bazar) => {
+    const memberId = getRecordMemberId(bazar.memberId);
+    if (!memberId) return acc;
+    acc[memberId] = (acc[memberId] || 0) + getBazarAmount(bazar);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const getGiveTake = (memberId: string): { value: number; label: string } => {
+    const mealCost = (mealsByMember[memberId] || 0) * stats.mealRate;
+    const totalBazar = bazarsByMember[memberId] || 0;
+    
+    if (totalBazar > mealCost) {
+      return { 
+        value: mealCost - totalBazar, 
+        label: `${(mealCost - totalBazar).toFixed(2)}` 
+      };
+    } else {
+      return { 
+        value: mealCost - totalBazar, 
+        label: `+${(mealCost - totalBazar).toFixed(2)}` 
+      };
+    }
+  };
+
+  const getBalanceValue = (memberId: string): number => totalRent + getGiveTake(memberId).value;
+  const totalGiveTake = members.reduce((sum, member) => sum + getGiveTake(member._id).value, 0);
+  const totalBalance = members.length * totalRent + totalGiveTake;
 
   return (
     <div style={{ animation: "fadeIn 0.5s", width: "100%", paddingRight: "20px" }}>
@@ -59,22 +187,22 @@ export default function SummaryPage() {
       <div style={statsGridStyle}>
         <StatCard 
           title="Total Members" 
-          value={loading ? "..." : members.length.toString()} 
+          value={loading ? "..." : stats.totalMembers.toString()} 
           icon={<Users size={20} color="#ffffff" />} 
         />
         <StatCard 
           title="Total Meals" 
-          value="0" 
+          value={stats.totalMeals.toFixed(1)} 
           icon={<Utensils size={20} color="#ffffff" />} 
         />
         <StatCard 
           title="Total Bazar" 
-          value="৳0" 
+          value={`৳${stats.totalBazar.toFixed(0)}`} 
           icon={<ShoppingCart size={20} color="#ffffff" />} 
         />
         <StatCard 
           title="Meal Rate" 
-          value="৳0.00" 
+          value={`৳${stats.mealRate.toFixed(2)}`} 
           icon={<TrendingUp size={20} color="#ffffff" />} 
         />
       </div>
@@ -93,14 +221,18 @@ export default function SummaryPage() {
                 <th style={thStyle}>Member</th>
                 <th style={thStyle}>Total Meals</th>
                 <th style={thStyle}>Meal Cost</th>
-                <th style={thStyle}>Total Payment</th>
-                <th style={thStyle}>Due</th>
+                <th style={thStyle}>Total Bazar</th>
+                <th style={thStyle}>Give/Take</th>
                 <th style={{...thStyle, textAlign: "right"}}>Balance</th>
               </tr>
             </thead>
             <tbody style={{ color: "#cbd5e1" }}>
               {members.length > 0 ? (
-                members.map((member) => (
+                members.map((member) => {
+                  const giveTake = getGiveTake(member._id);
+                  const balanceValue = getBalanceValue(member._id);
+
+                  return (
                   <tr key={member._id} style={trStyle}>
                     <td style={{ padding: "16px 12px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -111,15 +243,32 @@ export default function SummaryPage() {
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: "12px", color: '#10b981', fontWeight: '700' }}>0</td>
-                    <td style={{ padding: "12px", fontWeight: '500' }}>৳0.00</td>
-                    <td style={{ padding: "12px", color: '#6366f1', fontWeight: '600' }}>৳0.00</td>
-                    <td style={{ padding: "12px", color: '#ef4444', fontWeight: '600' }}>৳0.00</td>
+                    <td style={{ padding: "12px", color: '#10b981', fontWeight: '700' }}>
+                      {(mealsByMember[member._id] || 0).toFixed(1)}
+                    </td>
+                    <td style={{ padding: "12px", fontWeight: '500' }}>
+                      ৳{((mealsByMember[member._id] || 0) * stats.mealRate).toFixed(2)}
+                    </td>
+                    <td style={{ padding: "12px", color: '#f59e0b', fontWeight: '600' }}>
+                      ৳{(bazarsByMember[member._id] || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: "12px", fontWeight: '600', color: giveTake.value > 0 ? '#10b981' : '#ef4444' }}>
+                      ৳{giveTake.label}
+                    </td>
                     <td style={{ padding: "12px", textAlign: "right" }}>
-                      <span style={balanceBadgeStyle}>৳0.00</span>
+                      <span
+                        style={{
+                          ...balanceBadgeStyle,
+                          color: balanceValue >= 0 ? '#cbd5e1' : '#fda4af',
+                          border: balanceValue >= 0 ? '1px solid #334155' : '1px solid #7f1d1d'
+                        }}
+                      >
+                        ৳{balanceValue.toFixed(2)}
+                      </span>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr><td colSpan={6} style={{ padding: "60px", textAlign: "center", color: "#64748b" }}>No members found.</td></tr>
               )}
@@ -128,11 +277,11 @@ export default function SummaryPage() {
             <tfoot>
               <tr style={tfootStyle}>
                 <td style={{ padding: "20px 12px", fontWeight: "800", color: "#f8fafc" }}>Total Summary</td>
-                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#10b981" }}>0</td>
-                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#f8fafc" }}>৳0.00</td>
-                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#6366f1" }}>৳0.00</td>
-                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#ef4444" }}>৳0.00</td>
-                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#f8fafc", textAlign: "right" }}>৳0.00</td>
+                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#10b981" }}>{stats.totalMeals.toFixed(1)}</td>
+                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#f8fafc" }}>৳{(stats.totalMeals * stats.mealRate).toFixed(2)}</td>
+                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#f8fafc" }}>৳{stats.totalBazar.toFixed(2)}</td>
+                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#f8fafc" }}>৳{((stats.totalMeals * stats.mealRate) - stats.totalBazar).toFixed(2)}</td>
+                <td style={{ padding: "20px 12px", fontWeight: "800", color: "#f8fafc", textAlign: "right" }}>৳{totalBalance.toFixed(2)}</td>
               </tr>
             </tfoot>
           </table>

@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ObjectId } from 'mongodb';
-import clientPromise from '@/lib/mongodb';
+import dbConnect from '@/lib/mongoose';
+import Member from '@/lib/models/Member';
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function PUT(request: NextRequest, context: RouteContext) {
   try {
-    const client = await clientPromise;
-    const db = client.db("mess_db");
     const body = await request.json();
     const { _id, ...updateData } = body;
+    await dbConnect();
+    const { id } = await context.params;
 
-    const result = await db.collection("members").updateOne(
-      { _id: new ObjectId(params.id) },
-      { $set: updateData }
-    );
+    const result = await Member.findByIdAndUpdate(id, {
+      ...updateData,
+      updatedAt: new Date(),
+    });
 
-    if (result.matchedCount === 0) {
+    if (!result) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 });
     }
 
@@ -25,14 +29,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
-    const client = await clientPromise;
-    const db = client.db("mess_db");
+    await dbConnect();
+    const { id } = await context.params;
 
-    const result = await db.collection("members").deleteOne({ _id: new ObjectId(params.id) });
+    const result = await Member.findByIdAndDelete(id);
 
-    if (result.deletedCount === 0) {
+    if (!result) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 });
     }
 

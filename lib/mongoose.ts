@@ -5,6 +5,7 @@ import Meal from './models/Meal';
 import Bazar from './models/Bazar';
 import Payment from './models/Payment';
 import Summary from './models/Summary';
+import RentBill from './models/RentBill';
 
 const MONGODB_URI = process.env.MONGODB_URI!;
 

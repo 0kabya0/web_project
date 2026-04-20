@@ -1,12 +1,82 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ShoppingCart, Filter, Package } from "lucide-react";
+import { useGlobalStats } from "@/hooks/useGlobalStats";
+
+interface BazarRecord {
+  _id: string;
+  memberId: { _id: string; username: string } | string | null;
+  item: string;
+  quantity: number;
+  unit: string;
+  price: number;
+  date: string;
+}
+
+interface Member {
+  _id: string;
+  username: string;
+}
 
 export default function BazarPage() {
+  const { stats } = useGlobalStats();
   const [selectedMember, setSelectedMember] = useState("All");
+  const [bazarHistory, setBazarHistory] = useState<BazarRecord[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // This will be populated once you connect your MongoDB
-  const bazarHistory = [];
+  // Fetch bazar records and members
+  useEffect(() => {
+    fetchBazarHistory();
+    fetchMembers();
+  }, []);
+
+  const fetchBazarHistory = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/bazar");
+      if (response.ok) {
+        const data = await response.json();
+        setBazarHistory(data);
+      }
+    } catch (error) {
+      console.error("Error fetching bazar history:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMembers = async () => {
+    try {
+      const response = await fetch("/api/members");
+      if (response.ok) {
+        const data = await response.json();
+        setMembers(data);
+      }
+    } catch (error) {
+      console.error("Error fetching members:", error);
+    }
+  };
+
+  const getMemberName = (member: BazarRecord['memberId']) => {
+    if (!member || typeof member === 'string') return 'Unknown Member';
+    return member.username || 'Unknown Member';
+  };
+
+  const getMemberInitial = (member: BazarRecord['memberId']) => {
+    return getMemberName(member).charAt(0).toUpperCase();
+  };
+
+  // Filter bazar records
+  let filteredBazar = bazarHistory;
+  if (selectedMember !== "All") {
+    filteredBazar = filteredBazar.filter(
+      (b) => getMemberName(b.memberId) === selectedMember
+    );
+  }
+
+  // Calculate total amount for filtered records
+  const totalAmount = filteredBazar.reduce((sum, b) => sum + (b.price * b.quantity), 0);
 
   return (
     <div style={{ animation: "fadeIn 0.5s", color: "#f8fafc", paddingBottom: "40px", width: "100%", boxSizing: "border-box", paddingRight: "10px" }}>
@@ -23,8 +93,11 @@ export default function BazarPage() {
         <div>
           <p style={{ margin: 0, opacity: 0.9, fontSize: "14px", fontWeight: "500" }}>Total Bazar</p>
           <h2 style={{ margin: "5px 0 0 0", fontSize: "42px", fontWeight: "800" }}>
-            ৳0
+              ৳{stats.totalBazar.toFixed(0)}
           </h2>
+          <p style={{ margin: "8px 0 0 0", opacity: 0.85, fontSize: "13px" }}>
+            Total Members: {stats.totalMembers} | Total Meals: {stats.totalMeals.toFixed(1)}
+          </p>
         </div>
         <div style={iconWrapperStyle}>
           <ShoppingCart size={40} color="#fff" />
@@ -41,6 +114,11 @@ export default function BazarPage() {
             style={selectStyle}
           >
             <option>All</option>
+            {members.map((m) => (
+              <option key={m._id} value={m.username}>
+                {m.username}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -49,32 +127,56 @@ export default function BazarPage() {
       <div style={tableContainerStyle}>
         <h3 style={tableHeaderTitleStyle}>Bazar History</h3>
         
-        <div style={{ overflowX: "auto", width: "100%", borderRadius: "12px" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={tableHeaderRowStyle}>
-                <th style={thStyle}>Purchased By</th>
-                <th style={thStyle}>Date</th>
-                <th style={thStyle}>Items</th>
-                <th style={{ ...thStyle, textAlign: "right", paddingRight: "20px" }}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bazarHistory.length > 0 ? (
-                null
-              ) : (
-                <tr>
-                  <td colSpan={4} style={{ padding: "80px 0", textAlign: "center", color: "#64748b" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                      <Package size={40} color="#1e293b" />
-                      <span style={{ fontSize: "15px" }}>No bazar records found yet.</span>
-                    </div>
-                  </td>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>Loading...</div>
+        ) : (
+          <div style={{ overflowX: "auto", width: "100%", borderRadius: "12px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={tableHeaderRowStyle}>
+                  <th style={thStyle}>Purchased By</th>
+                  <th style={thStyle}>Date</th>
+                  <th style={thStyle}>Items</th>
+                  <th style={{ ...thStyle, textAlign: "right", paddingRight: "20px" }}>Amount</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filteredBazar.length > 0 ? (
+                  filteredBazar.map((record) => (
+                    <tr key={record._id} style={trStyle}>
+                      <td style={tdStyle}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={avatarStyle}>{getMemberInitial(record.memberId)}</div>
+                          <span style={{ fontWeight: "600", color: "#f8fafc" }}>
+                            {getMemberName(record.memberId)}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        {new Date(record.date).toLocaleDateString()}
+                      </td>
+                      <td style={tdStyle}>
+                        {record.quantity} {record.unit} - {record.item}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: "right", fontWeight: "bold", color: "#f8fafc" }}>
+                        ৳{(record.price * record.quantity).toFixed(0)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} style={{ padding: "80px 0", textAlign: "center", color: "#64748b" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+                        <Package size={40} color="#1e293b" />
+                        <span style={{ fontSize: "15px" }}>No bazar records found yet.</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -169,4 +271,18 @@ const tdStyle: React.CSSProperties = {
   color: "#cbd5e1", // Muted white
   fontSize: "14px",
   borderBottom: "1px solid #1e293b" 
+};
+
+const avatarStyle: React.CSSProperties = {
+  width: "32px",
+  height: "32px",
+  borderRadius: "50%",
+  background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#ffffff",
+  fontSize: "14px",
+  fontWeight: "700",
+  flexShrink: 0
 };

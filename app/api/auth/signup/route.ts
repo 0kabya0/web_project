@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
+import Member from '@/lib/models/Member';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,11 +27,15 @@ export async function POST(request: NextRequest) {
 
     await user.save();
 
+    // Do NOT create member here - user must be approved by admin first
+
     return NextResponse.json({
+      message: 'Signup successful. Your account is pending admin approval.',
       user: {
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role,
+        status: user.status
       }
     }, { status: 201 });
   } catch (error: any) {

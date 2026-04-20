@@ -5,7 +5,10 @@ import Member from '@/lib/models/Member';
 export async function GET() {
   try {
     await dbConnect();
-    const members = await Member.find({}).select('_id username email').lean();
+    const members = await Member.find({})
+      .select('_id username email role createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
     return NextResponse.json(members);
   } catch (error: any) {
     console.error('Error fetching members:', error);

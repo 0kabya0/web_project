@@ -4,6 +4,7 @@ import {
   Utensils, ShoppingCart, Wallet, TrendingUp, CalendarDays, 
   Edit3, Trash2, Plus, Save, X, User as UserIcon
 } from "lucide-react";
+import { useGlobalStats } from "@/hooks/useGlobalStats";
 
 interface Meal {
   _id: string;
@@ -19,9 +20,9 @@ interface Meal {
 interface Bazar {
   _id: string;
   item: string;
-  quantity: number;
   price: number;
-  total: number;
+  quantity?: number;
+  total?: number;
   date: string;
   memberId: { _id: string; username: string };
 }
@@ -31,12 +32,39 @@ interface Member {
   username: string;
 }
 
+interface Payment {
+  _id: string;
+  memberId: { _id: string; username: string };
+  amount: number;
+  paidDate: string;
+  monthKey: string;
+  status: string;
+}
+
+interface RentBill {
+  _id?: string;
+  monthKey: string;
+  roomRent: number;
+  wifiBill: number;
+  buaBill: number;
+}
+
 export default function ManageMess() {
+  const { stats: globalStats, refreshStats } = useGlobalStats();
   // --- 1. USER & DATA STATE ---
   const [userData, setUserData] = useState<any>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [bazars, setBazars] = useState<Bazar[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentChecks, setPaymentChecks] = useState<Record<string, boolean>>({});
+  const [rentBill, setRentBill] = useState<RentBill>({
+    monthKey: "",
+    roomRent: 0,
+    wifiBill: 0,
+    buaBill: 0,
+  });
+  const [savingRent, setSavingRent] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // --- 2. TAB & MODAL STATE ---
@@ -44,6 +72,7 @@ export default function ManageMess() {
   const [showMealModal, setShowMealModal] = useState(false);
   const [showBazarModal, setShowBazarModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const selectedMonth = selectedDate.slice(0, 7);
 
   // --- 3. FORM STATES ---
   const [mealForm, setMealForm] = useState({
@@ -52,15 +81,13 @@ export default function ManageMess() {
     breakfast: 0,
     lunch: 0,
     dinner: 0,
-    mealType: "own" as 'own' | 'guest',
+    mealType: "own" as 'own',
   });
 
   const [bazarForm, setBazarForm] = useState({
     memberId: "",
     date: selectedDate,
     item: "",
-    quantity: 1,
-    unit: "kg",
     price: 0,
     category: "groceries",
   });
@@ -74,22 +101,90 @@ export default function ManageMess() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    fetchRentBill();
+  }, [selectedMonth]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [membersRes, mealsRes, bazarsRes] = await Promise.all([
+      const [membersRes, mealsRes, bazarsRes, paymentsRes] = await Promise.all([
         fetch("/api/members"),
         fetch("/api/meals"),
-        fetch("/api/bazar")
+        fetch("/api/bazar"),
+        fetch("/api/payments")
       ]);
 
       if (membersRes.ok) setMembers(await membersRes.json());
       if (mealsRes.ok) setMeals(await mealsRes.json());
       if (bazarsRes.ok) setBazars(await bazarsRes.json());
+      if (paymentsRes.ok) setPayments(await paymentsRes.json());
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRentBill = async () => {
+    try {
+      const response = await fetch(`/api/rent?month=${selectedMonth}`);
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (data) {
+        setRentBill({
+          monthKey: data.monthKey || selectedMonth,
+          roomRent: Number(data.roomRent || 0),
+          wifiBill: Number(data.wifiBill || 0),
+          buaBill: Number(data.buaBill || 0),
+        });
+      } else {
+        setRentBill({ monthKey: selectedMonth, roomRent: 0, wifiBill: 0, buaBill: 0 });
+      }
+    } catch (error) {
+      console.error("Error fetching rent bill:", error);
+    }
+  };
+
+  const handleSaveRentBill = async () => {
+    if (userData?.role !== "admin") {
+      alert("Only admin can edit rent bills.");
+      return;
+    }
+
+    setSavingRent(true);
+    try {
+      const response = await fetch("/api/rent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          monthKey: selectedMonth,
+          roomRent: rentBill.roomRent,
+          wifiBill: rentBill.wifiBill,
+          buaBill: rentBill.buaBill,
+          updatedBy: userData?.username || "admin",
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data?.error || "Failed to save rent bills.");
+        return;
+      }
+
+      setRentBill({
+        monthKey: data.monthKey || selectedMonth,
+        roomRent: Number(data.roomRent || 0),
+        wifiBill: Number(data.wifiBill || 0),
+        buaBill: Number(data.buaBill || 0),
+      });
+      alert("Rent bills updated successfully.");
+    } catch (error) {
+      console.error("Error saving rent bills:", error);
+      alert("Failed to save rent bills.");
+    } finally {
+      setSavingRent(false);
     }
   };
 
@@ -114,6 +209,7 @@ export default function ManageMess() {
 
       if (response.ok) {
         await fetchData();
+        refreshStats();
         setShowMealModal(false);
         setMealForm({ memberId: "", date: selectedDate, breakfast: 0, lunch: 0, dinner: 0, mealType: "own" });
       } else {
@@ -128,7 +224,10 @@ export default function ManageMess() {
     if (confirm("Delete this meal record?")) {
       try {
         const response = await fetch(`/api/meals?id=${id}`, { method: "DELETE" });
-        if (response.ok) await fetchData();
+        if (response.ok) {
+          await fetchData();
+          refreshStats();
+        }
       } catch (error) {
         console.error("Error:", error);
       }
@@ -144,6 +243,8 @@ export default function ManageMess() {
 
     const payload = {
       ...bazarForm,
+      quantity: 1,
+      unit: "piece",
       date: new Date(bazarForm.date),
     };
 
@@ -156,8 +257,9 @@ export default function ManageMess() {
 
       if (response.ok) {
         await fetchData();
+        refreshStats();
         setShowBazarModal(false);
-        setBazarForm({ memberId: "", date: selectedDate, item: "", quantity: 1, unit: "kg", price: 0, category: "groceries" });
+        setBazarForm({ memberId: "", date: selectedDate, item: "", price: 0, category: "groceries" });
       } else {
         alert("Error adding bazar");
       }
@@ -170,7 +272,10 @@ export default function ManageMess() {
     if (confirm("Delete this bazar entry?")) {
       try {
         const response = await fetch(`/api/bazar?id=${id}`, { method: "DELETE" });
-        if (response.ok) await fetchData();
+        if (response.ok) {
+          await fetchData();
+          refreshStats();
+        }
       } catch (error) {
         console.error("Error:", error);
       }
@@ -178,17 +283,120 @@ export default function ManageMess() {
   };
 
   // --- 7. FILTER HELPERS ---
+  const monthMeals = meals.filter((m) => m.date.startsWith(selectedMonth));
+  const monthBazars = bazars.filter((b) => b.date.startsWith(selectedMonth));
+  const totalMonthMeals = monthMeals.reduce((sum, m) => sum + (m.total || 0), 0);
+  const totalMonthBazar = monthBazars.reduce((sum, b) => sum + (typeof b.total === "number" ? b.total : b.price), 0);
+  const monthlyMealRate = totalMonthMeals > 0 ? totalMonthBazar / totalMonthMeals : 0;
+  const getBazarMemberId = (memberRef: Bazar["memberId"]): string => {
+    if (typeof memberRef === "string") return memberRef;
+    return memberRef?._id || "";
+  };
+
+  const getBazarAmount = (bazar: Bazar): number => {
+    if (typeof bazar.total === "number" && Number.isFinite(bazar.total)) {
+      return bazar.total;
+    }
+    return Number(bazar.quantity || 0) * Number(bazar.price || 0);
+  };
+
+  const mealsByMember = meals.reduce((acc, meal) => {
+    const memberId = meal.memberId?._id;
+    if (!memberId) return acc;
+    acc[memberId] = (acc[memberId] || 0) + (meal.total || 0);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const bazarsByMember = bazars.reduce((acc, bazar) => {
+    const memberId = getBazarMemberId(bazar.memberId);
+    if (!memberId) return acc;
+    acc[memberId] = (acc[memberId] || 0) + getBazarAmount(bazar);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const totalRent = Number(rentBill.roomRent || 0) + Number(rentBill.wifiBill || 0) + Number(rentBill.buaBill || 0);
+
+  const getGiveTakeValue = (memberId: string): number => {
+    const mealCost = (mealsByMember[memberId] || 0) * globalStats.mealRate;
+    const memberBazar = bazarsByMember[memberId] || 0;
+    return mealCost - memberBazar;
+  };
+
+  const monthlyPaidMemberIds = new Set(
+    payments
+      .filter((p) => {
+        if (p.status !== "completed") return false;
+        const paidMonth = p.paidDate ? p.paidDate.slice(0, 7) : "";
+        return p.monthKey === selectedMonth || paidMonth === selectedMonth;
+      })
+      .map((p) => p.memberId?._id)
+  );
+
   const todaysMeals = meals.filter((m) => m.date.startsWith(selectedDate));
   const todaysBazars = bazars.filter((b) => b.date.startsWith(selectedDate));
   const totalMealsToday = todaysMeals.reduce((sum, m) => sum + m.total, 0);
-  const totalBazarToday = todaysBazars.reduce((sum, b) => sum + (b.quantity * b.price), 0);
+  const totalBazarToday = todaysBazars.reduce((sum, b) => sum + (typeof b.total === "number" ? b.total : b.price), 0);
+
+  const monthlyExpenseRows = members.map((member) => {
+    const monthlyExpense = totalRent + getGiveTakeValue(member._id);
+    return {
+      member,
+      monthlyExpense,
+      isPaid: monthlyPaidMemberIds.has(member._id),
+    };
+  });
+
+  const handleConfirmMonthlyPayment = async (memberId: string, amount: number) => {
+    if (!paymentChecks[memberId]) {
+      alert("Tick the confirm box first.");
+      return;
+    }
+
+    if (amount <= 0) {
+      alert("Total balance is 0 for this member.");
+      return;
+    }
+
+    if (!confirm("Confirm monthly expense payment for this member?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId,
+          amount,
+          date: selectedDate,
+          monthKey: selectedMonth,
+          description: `Monthly expense payment for ${selectedMonth}`,
+          paymentMethod: "cash",
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data?.error || "Failed to confirm payment.");
+        return;
+      }
+
+      setPaymentChecks((prev) => ({ ...prev, [memberId]: false }));
+      await fetchData();
+      refreshStats();
+      alert("Payment marked as completed.");
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      alert("Failed to confirm payment.");
+    }
+  };
 
   // --- 8. CALCULATE STATS ---
   const stats = [
     { title: "Total Meals Today", value: totalMealsToday.toFixed(1), icon: <Utensils color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
     { title: "Total Bazar Today", value: `৳${totalBazarToday.toFixed(0)}`, icon: <ShoppingCart color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
-    { title: "Own Meals", value: todaysMeals.filter((m) => m.mealType === "own").length, icon: <UserIcon color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
-    { title: "Guest Meals", value: todaysMeals.filter((m) => m.mealType === "guest").length, icon: <Utensils color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
+    { title: "Total Members", value: globalStats.totalMembers, icon: <UserIcon color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
+    { title: "All-Time Meals", value: globalStats.totalMeals.toFixed(1), icon: <Utensils color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
   ];
 
   if (loading) {
@@ -227,7 +435,7 @@ export default function ManageMess() {
 
       {/* TAB NAVIGATION */}
       <div style={styles.tabBar}>
-        {["Meals", "Bazar"].map((tab) => (
+        {["Meals", "Bazar", "Payments", "Rent"].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -326,7 +534,7 @@ export default function ManageMess() {
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>Bazar + Related Meals</h3>
               <button style={styles.btnAddBazar} onClick={() => {
-                setBazarForm({ memberId: "", date: selectedDate, item: "", quantity: 1, unit: "kg", price: 0, category: "groceries" });
+                setBazarForm({ memberId: "", date: selectedDate, item: "", price: 0, category: "groceries" });
                 setShowBazarModal(true);
               }}>
                 <Plus size={16} /> Add Bazar
@@ -342,9 +550,7 @@ export default function ManageMess() {
                       <tr style={styles.tableHeaderRow}>
                         <th style={styles.th}>Member</th>
                         <th style={styles.th}>Item</th>
-                        <th style={styles.th}>Qty</th>
-                        <th style={styles.th}>Price</th>
-                        <th style={{...styles.th, textAlign: "right"}}>Total</th>
+                        <th style={{...styles.th, textAlign: "right"}}>Price</th>
                         <th style={{...styles.th, textAlign: "center"}}>Action</th>
                       </tr>
                     </thead>
@@ -353,9 +559,7 @@ export default function ManageMess() {
                         <tr key={bazar._id} style={styles.tableRow}>
                           <td style={styles.td}>{bazar.memberId.username}</td>
                           <td style={styles.td}>{bazar.item}</td>
-                          <td style={styles.td}>{bazar.quantity}</td>
-                          <td style={styles.td}>৳{bazar.price.toFixed(2)}</td>
-                          <td style={{...styles.td, fontWeight: "bold", textAlign: "right"}}>৳{(bazar.quantity * bazar.price).toFixed(2)}</td>
+                          <td style={{...styles.td, fontWeight: "bold", textAlign: "right"}}>৳{(typeof bazar.total === "number" ? bazar.total : bazar.price).toFixed(2)}</td>
                           <td style={{...styles.td, textAlign: "center"}}>
                             <button
                               onClick={() => handleDeleteBazar(bazar._id)}
@@ -428,6 +632,137 @@ export default function ManageMess() {
             )}
           </>
         )}
+
+        {/* VIEW: PAYMENTS */}
+        {activeTab === "Payments" && (
+          <>
+            <div style={styles.sectionHeader}>
+              <div>
+                <h3 style={styles.sectionTitle}>Monthly Payment Confirmation</h3>
+                <p style={styles.sectionSubTitle}>
+                  Mark members as paid for {selectedMonth} after confirming each monthly expense.
+                </p>
+              </div>
+              <div style={styles.dateBadge}>
+                <Wallet size={16} color="#22c55e" />
+                <span>Meal Rate: ৳{monthlyMealRate.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div style={{ overflowX: "auto", borderRadius: "12px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={styles.tableHeaderRow}>
+                    <th style={styles.th}>Date</th>
+                    <th style={styles.th}>Member</th>
+                    <th style={styles.th}>Total Expense (Balance)</th>
+                    <th style={{ ...styles.th, textAlign: "center" }}>Confirm</th>
+                    <th style={{ ...styles.th, textAlign: "center" }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyExpenseRows.map((row) => (
+                    <tr key={row.member._id} style={styles.tableRow}>
+                      <td style={styles.td}>{selectedDate}</td>
+                      <td style={styles.td}>{row.member.username}</td>
+                      <td style={{ ...styles.td, fontWeight: 700 }}>৳{row.monthlyExpense.toFixed(2)}</td>
+                      <td style={{ ...styles.td, textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={row.isPaid || !!paymentChecks[row.member._id]}
+                          disabled={row.isPaid}
+                          onChange={(e) =>
+                            setPaymentChecks((prev) => ({
+                              ...prev,
+                              [row.member._id]: e.target.checked,
+                            }))
+                          }
+                        />
+                      </td>
+                      <td style={{ ...styles.td, textAlign: "center" }}>
+                        {row.isPaid ? (
+                          <span style={styles.paidBadge}>Paid</span>
+                        ) : (
+                          <button
+                            style={styles.btnConfirmPayment}
+                            onClick={() => handleConfirmMonthlyPayment(row.member._id, row.monthlyExpense)}
+                          >
+                            Confirm Payment
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* VIEW: RENT */}
+        {activeTab === "Rent" && (
+          <>
+            <div style={styles.sectionHeader}>
+              <div>
+                <h3 style={styles.sectionTitle}>Monthly Rent & Utility Bills</h3>
+                <p style={styles.sectionSubTitle}>Edit Room Rent, Wifi Bill and Rannar Maasi/Bua bill for {selectedMonth}</p>
+              </div>
+              <div style={styles.dateBadge}>
+                <Wallet size={16} color="#22c55e" />
+                <span>Total: ৳{(rentBill.roomRent + rentBill.wifiBill + rentBill.buaBill).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "20px" }}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Room Rent</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={rentBill.roomRent}
+                  disabled={userData?.role !== "admin"}
+                  onChange={(e) => setRentBill((prev) => ({ ...prev, roomRent: parseFloat(e.target.value) || 0 }))}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Wifi Bill</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={rentBill.wifiBill}
+                  disabled={userData?.role !== "admin"}
+                  onChange={(e) => setRentBill((prev) => ({ ...prev, wifiBill: parseFloat(e.target.value) || 0 }))}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Rannar Maasi/Bua Bill</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={rentBill.buaBill}
+                  disabled={userData?.role !== "admin"}
+                  onChange={(e) => setRentBill((prev) => ({ ...prev, buaBill: parseFloat(e.target.value) || 0 }))}
+                  style={styles.input}
+                />
+              </div>
+            </div>
+
+            {userData?.role === "admin" ? (
+              <button style={{ ...styles.btnSaveGradient, width: "fit-content" }} onClick={handleSaveRentBill} disabled={savingRent}>
+                <Save size={16} /> {savingRent ? "Saving..." : "Save Rent Bills"}
+              </button>
+            ) : (
+              <p style={{ color: "#94a3b8", margin: 0 }}>Only admin can edit rent bills.</p>
+            )}
+          </>
+        )}
       </div>
 
       {/* --- MODAL: ADD MEAL --- */}
@@ -457,20 +792,13 @@ export default function ManageMess() {
 
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Meal Type*</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <button
-                    onClick={() => setMealForm({ ...mealForm, mealType: "own" })}
-                    style={{...styles.mealTypeBtn, background: mealForm.mealType === "own" ? "#3b82f6" : "rgba(59, 130, 246, 0.2)", color: mealForm.mealType === "own" ? "#fff" : "#3b82f6"}}
-                  >
-                    Own Meal
-                  </button>
-                  <button
-                    onClick={() => setMealForm({ ...mealForm, mealType: "guest" })}
-                    style={{...styles.mealTypeBtn, background: mealForm.mealType === "guest" ? "#6b7280" : "rgba(107, 114, 128, 0.2)", color: mealForm.mealType === "guest" ? "#fff" : "#6b7280"}}
-                  >
-                    Guest Meal
-                  </button>
-                </div>
+                <button
+                  onClick={() => setMealForm({ ...mealForm, mealType: "own" })}
+                  style={{...styles.mealTypeBtn, width: "100%", background: "#3b82f6", color: "#fff", cursor: "default"}}
+                  disabled
+                >
+                  Own Meal
+                </button>
               </div>
 
               <div style={styles.inputGroup}>
@@ -483,7 +811,7 @@ export default function ManageMess() {
                 />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div style={styles.inputGroup}>
                   <label style={styles.label}>Breakfast</label>
                   <input
@@ -506,17 +834,17 @@ export default function ManageMess() {
                     style={styles.input}
                   />
                 </div>
-                <div style={styles.inputGroup}>
-                  <label style={styles.label}>Dinner</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={mealForm.dinner}
-                    onChange={(e) => setMealForm({ ...mealForm, dinner: parseFloat(e.target.value) || 0 })}
-                    style={styles.input}
-                  />
-                </div>
+              </div>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Dinner</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={mealForm.dinner}
+                  onChange={(e) => setMealForm({ ...mealForm, dinner: parseFloat(e.target.value) || 0 })}
+                  style={styles.input}
+                />
               </div>
             </div>
             <div style={styles.modalFooter}>
@@ -572,34 +900,8 @@ export default function ManageMess() {
                   style={styles.input}
                 />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <div style={styles.inputGroup}>
-                  <label style={styles.label}>Quantity</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={bazarForm.quantity}
-                    onChange={(e) => setBazarForm({ ...bazarForm, quantity: parseFloat(e.target.value) || 0 })}
-                    style={styles.input}
-                  />
-                </div>
-                <div style={styles.inputGroup}>
-                  <label style={styles.label}>Unit</label>
-                  <select
-                    value={bazarForm.unit}
-                    onChange={(e) => setBazarForm({ ...bazarForm, unit: e.target.value })}
-                    style={styles.input}
-                  >
-                    <option value="kg">KG</option>
-                    <option value="liter">Liter</option>
-                    <option value="piece">Piece</option>
-                    <option value="dozen">Dozen</option>
-                  </select>
-                </div>
-              </div>
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Price (৳)*</label>
+                <label style={styles.label}>Final Price (৳)*</label>
                 <input
                   type="number"
                   min="0"
@@ -654,6 +956,8 @@ const styles: { [key: string]: React.CSSProperties } = {
   
   btnAddMeal: { background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "10px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", fontWeight: "600" },
   btnAddBazar: { background: "#9a3412", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "10px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", fontWeight: "600" },
+  btnConfirmPayment: { background: "#16a34a", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" },
+  paidBadge: { background: "rgba(34,197,94,0.15)", color: "#22c55e", padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: "700" },
 
   emptyState: { display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "60px 0", color: "#475569" },
   

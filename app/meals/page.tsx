@@ -1,10 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Utensils, Users, Filter, Calendar, CheckCircle2, Plus, Trash2, Edit2, X } from "lucide-react";
+import { Utensils, Users, Filter, Calendar, CheckCircle2 } from "lucide-react";
+import { useGlobalStats } from "@/hooks/useGlobalStats";
 
 interface Meal {
   _id: string;
-  memberId: { _id: string; username: string; email: string };
+  memberId: { _id: string; username: string; email: string } | string | null;
   date: string;
   breakfast: number;
   lunch: number;
@@ -20,6 +21,7 @@ interface Member {
 }
 
 export default function MealsPage() {
+  const { stats } = useGlobalStats();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +36,7 @@ export default function MealsPage() {
     breakfast: 0,
     lunch: 0,
     dinner: 0,
-    mealType: "regular",
+    mealType: "own",
     notes: "",
   });
 
@@ -69,6 +71,17 @@ export default function MealsPage() {
     } catch (error) {
       console.error("Error fetching members:", error);
     }
+  };
+
+  const getMemberName = (member: Meal['memberId']) => {
+    if (!member) return 'Unknown Member';
+    if (typeof member === 'string') return 'Unknown Member';
+    return member.username || 'Unknown Member';
+  };
+
+  const getMemberInitial = (member: Meal['memberId']) => {
+    const name = getMemberName(member);
+    return name.charAt(0).toUpperCase();
   };
 
   // Handle form submission
@@ -141,7 +154,7 @@ export default function MealsPage() {
       breakfast: 0,
       lunch: 0,
       dinner: 0,
-      mealType: "regular",
+      mealType: "own",
       notes: "",
     });
     setEditingId(null);
@@ -151,7 +164,7 @@ export default function MealsPage() {
   let filteredMeals = meals;
   if (selectedMember !== "All Members") {
     filteredMeals = filteredMeals.filter(
-      (m) => m.memberId.username === selectedMember
+      (m) => getMemberName(m.memberId) === selectedMember
     );
   }
   if (selectedDate) {
@@ -168,181 +181,13 @@ export default function MealsPage() {
   return (
     <div style={{ animation: "fadeIn 0.5s", color: "#f8fafc", width: "100%", boxSizing: "border-box", paddingRight: "10px" }}>
       {/* HEADER */}
-      <header style={{ marginBottom: "30px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <header style={{ marginBottom: "30px" }}>
         <div>
           <h1 style={{ fontSize: "28px", fontWeight: "bold", margin: 0 }}>Meals</h1>
-          <p style={{ color: "#94a3b8", marginTop: "5px" }}>Manage meal records</p>
+          <p style={{ color: "#94a3b8", marginTop: "5px" }}>View your meal records</p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          style={{
-            background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)",
-            color: "#fff",
-            border: "none",
-            padding: "12px 20px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            fontWeight: "600",
-          }}
-        >
-          <Plus size={18} /> Add Meal
-        </button>
       </header>
 
-      {/* ADD/EDIT FORM MODAL */}
-      {showForm && (
-        <div style={modalOverlayStyle}>
-          <div style={modalContentStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h2 style={{ margin: 0 }}>{editingId ? "Edit Meal" : "Add Meal Record"}</h2>
-              <button
-                onClick={() => {
-                  setShowForm(false);
-                  resetForm();
-                }}
-                style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} style={{ display: "grid", gap: "15px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
-                <div>
-                  <label style={labelStyle}>Member*</label>
-                  <select
-                    value={formData.memberId}
-                    onChange={(e) => setFormData({ ...formData, memberId: e.target.value })}
-                    style={inputStyle}
-                  >
-                    <option value="">Select Member</option>
-                    {members.map((m) => (
-                      <option key={m._id} value={m._id}>
-                        {m.username}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Date*</label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    style={inputStyle}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "15px" }}>
-                <div>
-                  <label style={labelStyle}>Breakfast</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={formData.breakfast}
-                    onChange={(e) => setFormData({ ...formData, breakfast: parseFloat(e.target.value) || 0 })}
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Lunch</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={formData.lunch}
-                    onChange={(e) => setFormData({ ...formData, lunch: parseFloat(e.target.value) || 0 })}
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Dinner</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={formData.dinner}
-                    onChange={(e) => setFormData({ ...formData, dinner: parseFloat(e.target.value) || 0 })}
-                    style={inputStyle}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
-                <div>
-                  <label style={labelStyle}>Meal Type</label>
-                  <select
-                    value={formData.mealType}
-                    onChange={(e) => setFormData({ ...formData, mealType: e.target.value })}
-                    style={inputStyle}
-                  >
-                    <option value="regular">Regular</option>
-                    <option value="special">Special</option>
-                    <option value="paid_separately">Paid Separately</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Notes</label>
-                  <input
-                    type="text"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Optional notes"
-                    style={inputStyle}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "20px" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    resetForm();
-                  }}
-                  style={{
-                    background: "#1e293b",
-                    color: "#94a3b8",
-                    border: "1px solid #334155",
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)",
-                    color: "#fff",
-                    border: "none",
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    fontWeight: "600",
-                  }}
-                >
-                  {editingId ? "Update" : "Save"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* STAT CARDS */}
       <div style={statsGridStyle}>
@@ -358,11 +203,21 @@ export default function MealsPage() {
 
         <div style={statCardGradientStyle}>
           <div>
+            <p style={statLabelStyle}>Total Members</p>
+            <h2 style={statValueStyle}>{stats.totalMembers}</h2>
+          </div>
+          <div style={iconBoxGlassStyle}>
+            <Users size={20} color="#ffffff" />
+          </div>
+        </div>
+
+        <div style={statCardGradientStyle}>
+          <div>
             <p style={statLabelStyle}>Records</p>
             <h2 style={statValueStyle}>{totalRecords}</h2>
           </div>
           <div style={iconBoxGlassStyle}>
-            <Users size={20} color="#ffffff" />
+            <Filter size={20} color="#ffffff" />
           </div>
         </div>
 
@@ -372,7 +227,7 @@ export default function MealsPage() {
             <h2 style={statValueStyle}>{avgMealsPerRecord}</h2>
           </div>
           <div style={iconBoxGlassStyle}>
-            <Filter size={20} color="#ffffff" />
+            <CheckCircle2 size={20} color="#ffffff" />
           </div>
         </div>
       </div>
@@ -443,7 +298,6 @@ export default function MealsPage() {
                   <th style={thStyle}>Lunch</th>
                   <th style={thStyle}>Dinner</th>
                   <th style={{...thStyle, textAlign: "right"}}>Total</th>
-                  <th style={{...thStyle, textAlign: "center"}}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -452,9 +306,9 @@ export default function MealsPage() {
                     <tr key={meal._id} style={trStyle}>
                       <td style={tdStyle}>
                         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                          <div style={avatarStyle}>{meal.memberId.username.charAt(0)}</div>
+                          <div style={avatarStyle}>{getMemberInitial(meal.memberId)}</div>
                           <span style={{ fontWeight: "600", color: "#f8fafc" }}>
-                            {meal.memberId.username}
+                            {getMemberName(meal.memberId)}
                           </span>
                         </div>
                       </td>
@@ -467,50 +321,14 @@ export default function MealsPage() {
                       <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "right", color: "#f8fafc" }}>
                         {meal.total}
                       </td>
-                      <td style={{ ...tdStyle, textAlign: "center", display: "flex", gap: "8px", justifyContent: "center" }}>
-                        <button
-                          onClick={() => handleEdit(meal)}
-                          style={{
-                            background: "#1e293b",
-                            border: "1px solid #334155",
-                            color: "#3b82f6",
-                            padding: "6px 10px",
-                            borderRadius: "6px",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                          }}
-                          title="Edit"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(meal._id)}
-                          style={{
-                            background: "#1e293b",
-                            border: "1px solid #334155",
-                            color: "#ef4444",
-                            padding: "6px 10px",
-                            borderRadius: "6px",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                          }}
-                          title="Delete"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} style={{ padding: "80px", textAlign: "center", color: "#64748b" }}>
+                    <td colSpan={6} style={{ padding: "80px", textAlign: "center", color: "#64748b" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
                         <Utensils size={32} color="#1e293b" />
-                        <span>No meal records found. Click "Add Meal" to create one.</span>
+                        <span>No meal records found.</span>
                       </div>
                     </td>
                   </tr>
@@ -528,7 +346,7 @@ export default function MealsPage() {
 
 const statsGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, 1fr)",
+  gridTemplateColumns: "repeat(4, 1fr)",
   gap: "20px",
   marginBottom: "30px",
   width: "100%",

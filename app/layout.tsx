@@ -12,13 +12,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [userData, setUserData] = useState({ username: "Guest" });
+  const [userData, setUserData] = useState<{ username: string; role?: string }>({ username: "Guest" });
 
   // Load user data from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("mess_user");
     if (saved) {
-      setUserData(JSON.parse(saved));
+      const parsed = JSON.parse(saved);
+      setUserData({
+        username: parsed.role === "admin" ? `${parsed.username} - Manager` : (parsed.username || "Guest"),
+        role: parsed.role
+      });
     }
   }, [pathname]);
 
