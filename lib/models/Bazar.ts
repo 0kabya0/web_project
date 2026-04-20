@@ -43,7 +43,7 @@ const BazarSchema = new mongoose.Schema({
   },
   total: {
     type: Number,
-    default: function() {
+    default: function(this: { quantity: number; price: number }): number {
       return this.quantity * this.price;
     },
   },
@@ -71,7 +71,7 @@ const BazarSchema = new mongoose.Schema({
 });
 
 // Auto-calculate total before saving - Using async/await syntax
-BazarSchema.pre('save', async function() {
+BazarSchema.pre('save', async function(this: { quantity: number; price: number; total: number }) {
   this.total = this.quantity * this.price;
 });
 

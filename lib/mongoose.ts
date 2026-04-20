@@ -6,6 +6,7 @@ import Bazar from './models/Bazar';
 import Payment from './models/Payment';
 import Summary from './models/Summary';
 import RentBill from './models/RentBill';
+import ResetHistory from './models/ResetHistory';
 
 const MONGODB_URI = process.env.MONGODB_URI!;
 

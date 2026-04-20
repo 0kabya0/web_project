@@ -65,6 +65,7 @@ export default function ManageMess() {
     buaBill: 0,
   });
   const [savingRent, setSavingRent] = useState(false);
+  const [resettingData, setResettingData] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // --- 2. TAB & MODAL STATE ---
@@ -73,6 +74,9 @@ export default function ManageMess() {
   const [showBazarModal, setShowBazarModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const selectedMonth = selectedDate.slice(0, 7);
+  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  const currentDay = new Date().getDate();
+  const canResetMonth = currentDay >= 26;
 
   // --- 3. FORM STATES ---
   const [mealForm, setMealForm] = useState({
@@ -185,6 +189,49 @@ export default function ManageMess() {
       alert("Failed to save rent bills.");
     } finally {
       setSavingRent(false);
+    }
+  };
+
+  const handleResetMonth = async () => {
+    if (userData?.role !== "admin") {
+      alert("Only admin can reset monthly data.");
+      return;
+    }
+
+    if (!canResetMonth) {
+      alert("Reset is available only from the 26th to the end of the month.");
+      return;
+    }
+
+    if (!confirm(`Reset meals, bazar, and payments for ${currentMonthKey}? This will archive the current month history first.`)) {
+      return;
+    }
+
+    setResettingData(true);
+    try {
+      const response = await fetch("/api/reset-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          monthKey: currentMonthKey,
+          resetBy: userData?.username || "admin",
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data?.error || "Failed to reset monthly data.");
+        return;
+      }
+
+      await fetchData();
+      refreshStats();
+      alert("Monthly data reset successfully and saved to history.");
+    } catch (error) {
+      console.error("Error resetting monthly data:", error);
+      alert("Failed to reset monthly data.");
+    } finally {
+      setResettingData(false);
     }
   };
 
@@ -417,7 +464,21 @@ export default function ManageMess() {
             style={{ background: "rgba(255,255,255,0.1)", border: "none", padding: "6px 12px", borderRadius: "8px", color: "#fff", cursor: "pointer" }}
           />
           <span style={styles.changeTerm}>{userData?.username || "User"}</span>
+          {userData?.role === "admin" && (
+            <button
+              onClick={handleResetMonth}
+              disabled={!canResetMonth || resettingData}
+              style={{
+                ...styles.btnReset,
+                opacity: !canResetMonth || resettingData ? 0.55 : 1,
+                cursor: !canResetMonth || resettingData ? "not-allowed" : "pointer",
+              }}
+            >
+              {resettingData ? "Resetting..." : canResetMonth ? "Reset Month" : "Reset Locked"}
+            </button>
+          )}
         </div>
+        <p style={styles.resetHint}>{canResetMonth ? "Reset is enabled for this month." : "Reset is locked from day 1 to 25."}</p>
       </header>
 
       {/* STATS SECTION */}
@@ -931,12 +992,13 @@ const styles: { [key: string]: React.CSSProperties } = {
   header: { marginBottom: "30px" },
   title: { fontSize: "28px", fontWeight: "bold", margin: 0 },
   banner: { 
-    display: "flex", alignItems: "center", gap: "10px", 
+    display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", 
     background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)", 
     padding: "12px 20px", borderRadius: "12px", marginTop: "15px", width: "fit-content" 
   },
   termText: { color: "#fff", fontWeight: "500", fontSize: "14px" },
   changeTerm: { color: "rgba(255,255,255,0.7)", fontSize: "12px", cursor: "pointer", marginLeft: "20px" },
+  resetHint: { color: "#94a3b8", margin: "10px 0 0 0", fontSize: "12px" },
 
   statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px", marginBottom: "30px" },
   statCard: { padding: "20px", borderRadius: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff" },
@@ -958,6 +1020,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   btnAddBazar: { background: "#9a3412", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "10px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", fontWeight: "600" },
   btnConfirmPayment: { background: "#16a34a", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" },
   paidBadge: { background: "rgba(34,197,94,0.15)", color: "#22c55e", padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: "700" },
+  btnReset: { background: "rgba(239,68,68,0.18)", color: "#fecaca", border: "1px solid rgba(239,68,68,0.35)", padding: "8px 14px", borderRadius: "10px", fontWeight: "700" },
 
   emptyState: { display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "60px 0", color: "#475569" },
   

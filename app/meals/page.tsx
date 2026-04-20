@@ -84,6 +84,12 @@ export default function MealsPage() {
     return name.charAt(0).toUpperCase();
   };
 
+  const getMemberIdValue = (member: Meal['memberId']) => {
+    if (!member) return "";
+    if (typeof member === "string") return member;
+    return member._id;
+  };
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +141,7 @@ export default function MealsPage() {
 
   const handleEdit = (meal: Meal) => {
     setFormData({
-      memberId: meal.memberId._id,
+      memberId: getMemberIdValue(meal.memberId),
       date: meal.date.split("T")[0],
       breakfast: meal.breakfast,
       lunch: meal.lunch,

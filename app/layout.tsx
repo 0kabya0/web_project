@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, ClipboardList, Utensils, ShoppingCart, 
   Wallet, User, FileText, LogOut, ChevronDown,
-  Users, Settings // Added icons for the new sections
+  Users, Settings, History // Added icons for the new sections
 } from "lucide-react";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -41,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     { icon: <Wallet size={20} />, label: "Payments", href: "/payments", roles: ['admin', 'user'] },
     { icon: <Users size={20} />, label: "Members", href: "/members", roles: ['admin'] },
     { icon: <Settings size={20} />, label: "Manage Mess", href: "/managemess", roles: ['admin'] },
+    { icon: <History size={20} />, label: "History", href: "/history", roles: ['admin'] },
     { icon: <User size={20} />, label: "My Profile", href: "/profile", roles: ['admin', 'user'] },
     { icon: <FileText size={20} />, label: "Reports", href: "/reports", roles: ['admin'] },
   ];

@@ -6,3 +6,4 @@ export { default as Bazar } from './Bazar';
 export { default as Payment } from './Payment';
 export { default as Summary } from './Summary';
 export { default as RentBill } from './RentBill';
+export { default as ResetHistory } from './ResetHistory';
