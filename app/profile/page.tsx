@@ -279,130 +279,147 @@ export default function ProfilePage() {
 // --- STYLES ---
 
 const profileCardStyle: React.CSSProperties = {
-  background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)", 
-  padding: "30px",
-  borderRadius: "24px",
+  background: "radial-gradient(circle at 15% 20%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.05) 28%, rgba(0,0,0,0) 55%), linear-gradient(120deg, #4f46e5 0%, #7c3aed 45%, #db2777 100%)",
+  padding: "32px",
+  borderRadius: "26px",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginBottom: "25px",
+  marginBottom: "26px",
   flexWrap: "wrap",
-  gap: "20px",
-  boxShadow: "0 10px 20px -5px rgba(99, 102, 241, 0.4)",
+  gap: "22px",
+  boxShadow: "0 20px 40px -15px rgba(79, 70, 229, 0.65)",
   color: "#ffffff",
-  border: "1px solid rgba(255, 255, 255, 0.1)"
+  border: "1px solid rgba(255, 255, 255, 0.2)"
 };
 
 const balanceContainerStyle: React.CSSProperties = {
   textAlign: "right",
-  minWidth: "120px"
+  minWidth: "170px",
+  background: "rgba(0, 0, 0, 0.18)",
+  padding: "14px 16px",
+  borderRadius: "14px",
+  border: "1px solid rgba(255,255,255,0.2)",
+  backdropFilter: "blur(4px)"
 };
 
 const avatarStyle: React.CSSProperties = {
-  width: "65px",
-  height: "65px",
-  borderRadius: "16px",
-  background: "rgba(255, 255, 255, 0.2)", 
+  width: "70px",
+  height: "70px",
+  borderRadius: "18px",
+  background: "linear-gradient(145deg, rgba(255,255,255,0.35), rgba(255,255,255,0.15))",
   color: "#ffffff",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: "26px",
+  fontSize: "28px",
   fontWeight: "bold",
   flexShrink: 0,
-  border: "1px solid rgba(255, 255, 255, 0.3)"
+  border: "1px solid rgba(255, 255, 255, 0.45)",
+  boxShadow: "0 10px 24px rgba(15, 23, 42, 0.35)"
 };
 
 const infoItemStyle = {
   display: "flex",
   alignItems: "center",
-  gap: "6px",
+  gap: "8px",
   color: "#ffffff",
-  fontSize: "14px",
-  opacity: 0.9
+  fontSize: "13px",
+  fontWeight: "600",
+  opacity: 0.95,
+  background: "rgba(0,0,0,0.16)",
+  border: "1px solid rgba(255,255,255,0.2)",
+  borderRadius: "999px",
+  padding: "6px 10px"
 };
 
 const activeTabStyle = {
-  padding: "10px 20px",
+  padding: "10px 18px",
   borderRadius: "12px",
-  border: "1px solid #1e293b",
-  backgroundColor: "#1e293b",
+  border: "1px solid #334155",
+  backgroundColor: "#111827",
   color: "#f8fafc",
   fontSize: "14px",
   fontWeight: "700",
-  cursor: "default"
+  cursor: "default",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)"
 };
 
 const tableContainerStyle: React.CSSProperties = {
-  background: "#0f172a",
+  background: "linear-gradient(180deg, #0f172a 0%, #0b1220 100%)",
   padding: "30px",
   borderRadius: "24px",
-  boxShadow: "0 20px 25px -5px rgba(0,0,0,0.2)",
-  border: "1px solid #1e293b",
+  boxShadow: "0 24px 34px -12px rgba(2, 6, 23, 0.65)",
+  border: "1px solid #1f2937",
   overflow: "hidden"
 };
 
 const tableHeaderRowStyle = {
-  background: "#1e293b"
+  background: "linear-gradient(90deg, #1e293b 0%, #1f2a44 100%)"
 };
 
 const thStyle: React.CSSProperties = {
   textAlign: "left",
-  padding: "15px 12px",
+  padding: "14px 12px",
   color: "#94a3b8",
-  fontSize: "12px",
+  fontSize: "11px",
   fontWeight: "700",
-  textTransform: "uppercase" as const
+  letterSpacing: "0.08em",
+  textTransform: "uppercase" as const,
+  borderBottom: "1px solid #273449"
 };
 
 const trStyle = {
-  borderBottom: "1px solid #1e293b"
+  borderBottom: "1px solid #1f2a3d"
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: "20px 12px",
+  padding: "18px 12px",
   color: "#cbd5e1",
-  fontSize: "14px"
+  fontSize: "14px",
+  verticalAlign: "middle"
 };
 
 const paidBadgeStyle = {
-  background: "rgba(59, 130, 246, 0.1)",
-  color: "#3b82f6",
-  padding: "4px 12px",
-  borderRadius: "8px",
+  background: "rgba(16, 185, 129, 0.18)",
+  color: "#34d399",
+  padding: "5px 12px",
+  borderRadius: "999px",
+  border: "1px solid rgba(52, 211, 153, 0.35)",
   fontSize: "12px",
   fontWeight: "700"
 };
 
 const notPaidBadgeStyle = {
-  background: "rgba(239, 68, 68, 0.12)",
-  color: "#f87171",
-  padding: "4px 12px",
-  borderRadius: "8px",
+  background: "rgba(239, 68, 68, 0.14)",
+  color: "#fca5a5",
+  padding: "5px 12px",
+  borderRadius: "999px",
+  border: "1px solid rgba(252, 165, 165, 0.3)",
   fontSize: "12px",
   fontWeight: "700"
 };
 
 const memberInfoCardStyle: React.CSSProperties = {
-  background: "#0f172a",
+  background: "linear-gradient(180deg, #0f172a 0%, #0b1220 100%)",
   padding: "24px",
   borderRadius: "24px",
-  border: "1px solid #1e293b",
-  boxShadow: "0 20px 25px -5px rgba(0,0,0,0.2)",
-  marginBottom: "25px",
+  border: "1px solid #1f2937",
+  boxShadow: "0 24px 34px -12px rgba(2, 6, 23, 0.65)",
+  marginBottom: "25px"
 };
 
 const memberInfoGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "14px",
+  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+  gap: "12px"
 };
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: "16px", padding: "16px" }}>
-      <div style={{ color: "#94a3b8", fontSize: "12px", textTransform: "uppercase", fontWeight: "700", marginBottom: "6px" }}>{label}</div>
-      <div style={{ color: "#f8fafc", fontSize: "15px", fontWeight: "700" }}>{value}</div>
+    <div style={{ background: "linear-gradient(180deg, #111827 0%, #0f172a 100%)", border: "1px solid #23314a", borderRadius: "16px", padding: "14px 16px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)" }}>
+      <div style={{ color: "#93a4bf", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: "700", marginBottom: "8px" }}>{label}</div>
+      <div style={{ color: "#f8fafc", fontSize: "15px", fontWeight: "700", lineHeight: 1.3 }}>{value}</div>
     </div>
   );
 }
