@@ -9,7 +9,6 @@ import {
   Wallet, 
   TrendingUp, 
   Calendar, 
-  ChevronDown,
   Scale,
   Download
 } from "lucide-react";
@@ -28,6 +27,7 @@ interface Member {
   _id: string;
   username: string;
   email: string;
+  role?: string;
 }
 
 interface MealRecord {
@@ -61,12 +61,19 @@ interface PaymentRecord {
   status: string;
 }
 
-const currentMonthKey = new Date().toISOString().slice(0, 7);
+const getLocalMonthKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+};
+
+const currentMonthKey = getLocalMonthKey();
 
 export default function ReportsPage() {
   const { stats } = useGlobalStats();
   const [activeTab, setActiveTab] = useState<ReportTab>("Monthly Summary");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+  const [currentNow, setCurrentNow] = useState(() => new Date());
   const [userRole, setUserRole] = useState("user");
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<Member[]>([]);
@@ -96,7 +103,10 @@ export default function ReportsPage() {
           fetch("/api/payments"),
         ]);
 
-        if (membersRes.ok) setMembers(await membersRes.json());
+        if (membersRes.ok) {
+          const data = await membersRes.json();
+          setMembers(Array.isArray(data) ? data.filter((member: Member) => member.role !== "admin") : []);
+        }
         if (mealsRes.ok) setMeals(await mealsRes.json());
         if (bazarRes.ok) setBazar(await bazarRes.json());
         if (paymentsRes.ok) setPayments(await paymentsRes.json());
@@ -135,6 +145,13 @@ export default function ReportsPage() {
 
     fetchRentForMonth();
   }, [selectedMonth]);
+
+  useEffect(() => {
+    const syncNow = () => setCurrentNow(new Date());
+    syncNow();
+    const timer = window.setInterval(syncNow, 60000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const isAdmin = userRole === "admin";
 
@@ -199,54 +216,51 @@ export default function ReportsPage() {
   const monthPaymentTotal = monthPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
   const monthMealRate = monthMealTotal > 0 ? monthBazarTotal / monthMealTotal : 0;
 
-  const allMealsByMember = useMemo(() => {
-    return meals.reduce((acc, meal) => {
+  const monthMealsByMember = useMemo(() => {
+    return monthMeals.reduce((acc, meal) => {
       const memberId = getRecordMember(meal.memberId).id;
       if (!memberId) return acc;
       acc[memberId] = (acc[memberId] || 0) + (meal.total || 0);
       return acc;
     }, {} as Record<string, number>);
-  }, [meals]);
+  }, [monthMeals]);
 
-  const allBazarsByMember = useMemo(() => {
-    return bazar.reduce((acc, entry) => {
+  const monthBazarsByMember = useMemo(() => {
+    return monthBazars.reduce((acc, entry) => {
       const memberId = getRecordMember(entry.memberId).id;
       if (!memberId) return acc;
       const amount = (entry.total ?? entry.quantity * entry.price) || 0;
       acc[memberId] = (acc[memberId] || 0) + amount;
       return acc;
     }, {} as Record<string, number>);
-  }, [bazar]);
+  }, [monthBazars]);
 
-  const allTimeMealRate = stats.totalMeals > 0 ? stats.totalBazar / stats.totalMeals : 0;
-
-  const allTimeMemberBalances = useMemo(() => {
-    return members.reduce((acc, member) => {
-      const mealCost = (allMealsByMember[member._id] || 0) * allTimeMealRate;
-      const giveTake = mealCost - (allBazarsByMember[member._id] || 0);
-      acc[member._id] = selectedMonthRent + giveTake;
-      return acc;
-    }, {} as Record<string, number>);
-  }, [members, allMealsByMember, allBazarsByMember, allTimeMealRate, selectedMonthRent]);
-
-  const paidMemberIds = useMemo(() => {
+  const monthPaidMemberIds = useMemo(() => {
     return new Set(
-      payments
-        .filter((payment) => payment.status === "completed")
+      monthPayments
         .map((payment) => getRecordMember(payment.memberId).id)
         .filter(Boolean)
     );
-  }, [payments]);
+  }, [monthPayments]);
+
+  const monthMemberBalances = useMemo(() => {
+    return members.reduce((acc, member) => {
+      const mealCost = (monthMealsByMember[member._id] || 0) * monthMealRate;
+      const giveTake = mealCost - (monthBazarsByMember[member._id] || 0);
+      acc[member._id] = selectedMonthRent + giveTake;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [members, monthMealsByMember, monthBazarsByMember, monthMealRate, selectedMonthRent]);
 
   const totalPaidBalance = useMemo(() => {
     return members
-      .filter((member) => paidMemberIds.has(member._id))
-      .reduce((sum, member) => sum + (allTimeMemberBalances[member._id] || 0), 0);
-  }, [members, paidMemberIds, allTimeMemberBalances]);
+      .filter((member) => monthPaidMemberIds.has(member._id))
+      .reduce((sum, member) => sum + (monthMemberBalances[member._id] || 0), 0);
+  }, [members, monthPaidMemberIds, monthMemberBalances]);
 
   const totalSummaryBalance = useMemo(() => {
-    return members.reduce((sum, member) => sum + (allTimeMemberBalances[member._id] || 0), 0);
-  }, [members, allTimeMemberBalances]);
+    return members.reduce((sum, member) => sum + (monthMemberBalances[member._id] || 0), 0);
+  }, [members, monthMemberBalances]);
 
   const monthBazarByMember = useMemo(() => {
     return monthBazars.reduce((acc, entry) => {
@@ -388,7 +402,6 @@ export default function ReportsPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px", gap: "12px" }}>
               <div>
                 <h4 style={{ margin: 0, fontSize: "16px", color: "#94a3b8", fontWeight: "600" }}>Current Period</h4>
-                <p style={{ margin: "6px 0 0 0", color: "#e2e8f0", fontSize: "14px" }}>{selectedMonthLabel}</p>
               </div>
               <div style={statusBadgeStyle}>{formatCurrency(monthBalance)}</div>
             </div>
@@ -588,7 +601,6 @@ export default function ReportsPage() {
             </option>
           ))}
         </select>
-        <ChevronDown size={18} color="#94a3b8" style={{ marginLeft: "auto" }} />
       </div>
 
       {/* TOP STATS CARDS */}

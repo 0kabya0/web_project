@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, ClipboardList, Utensils, ShoppingCart, 
   Wallet, User, FileText, LogOut, ChevronDown,
-  Users, Settings, History // Added icons for the new sections
+  Users, Settings
 } from "lucide-react";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -41,7 +41,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     { icon: <Wallet size={20} />, label: "Payments", href: "/payments", roles: ['admin', 'user'] },
     { icon: <Users size={20} />, label: "Members", href: "/members", roles: ['admin'] },
     { icon: <Settings size={20} />, label: "Manage Mess", href: "/managemess", roles: ['admin'] },
-    { icon: <History size={20} />, label: "History", href: "/history", roles: ['admin'] },
     { icon: <User size={20} />, label: "My Profile", href: "/profile", roles: ['admin', 'user'] },
     { icon: <FileText size={20} />, label: "Reports", href: "/reports", roles: ['admin'] },
   ];
@@ -50,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <html lang="en">
-      <body style={styles.container}>
+      <body style={styles.container} className="app-root">
         <style>{`
           @keyframes floatBtn {
             0% { transform: translateY(0px); }
@@ -77,7 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         `}</style>
 
         {!isLoginPage && (
-          <aside style={styles.sidebar}>
+          <aside style={styles.sidebar} className="sidebar">
             <div style={styles.logoSection}>
               <div style={styles.logoIcon}>🏠</div>
               <h2 style={styles.logoText}>MESS MASTER</h2>
@@ -100,10 +99,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main style={{ 
           ...styles.mainContent, 
           ...(isLoginPage ? styles.authMainContent : {}) 
-        }}>
+        }} className={isLoginPage ? "container auth-container" : "container"}>
           {/* TOP RIGHT USER BOX */}
           {!isLoginPage && (
-            <div style={styles.topRightActions}>
+            <div style={styles.topRightActions} className="topRightActions">
               <div 
                 style={styles.userDropdownTrigger} 
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -111,7 +110,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div style={styles.avatar}>
                   {userData.username.charAt(0).toUpperCase()}
                 </div>
-                <span style={styles.username}>{userData.username}</span>
+                  <span style={styles.username} className="username">{userData.username}</span>
                 <ChevronDown size={16} color="#94a3b8" />
 
                 {/* DROPDOWN MENU */}

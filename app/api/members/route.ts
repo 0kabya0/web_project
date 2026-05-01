@@ -6,7 +6,7 @@ export async function GET() {
   try {
     await dbConnect();
     const members = await Member.find({})
-      .select('_id username email role createdAt')
+      .select('_id username email role phone roomNumber address isActive createdAt')
       .sort({ createdAt: -1 })
       .lean();
     return NextResponse.json(members);

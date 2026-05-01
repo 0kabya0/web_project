@@ -30,6 +30,7 @@ interface Bazar {
 interface Member {
   _id: string;
   username: string;
+  role?: string;
 }
 
 interface Payment {
@@ -39,6 +40,7 @@ interface Payment {
   paidDate: string;
   monthKey: string;
   status: string;
+  description?: string;
 }
 
 interface RentBill {
@@ -48,6 +50,19 @@ interface RentBill {
   wifiBill: number;
   buaBill: number;
 }
+
+const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getLocalMonthKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+};
 
 export default function ManageMess() {
   const { stats: globalStats, refreshStats } = useGlobalStats();
@@ -65,18 +80,16 @@ export default function ManageMess() {
     buaBill: 0,
   });
   const [savingRent, setSavingRent] = useState(false);
-  const [resettingData, setResettingData] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // --- 2. TAB & MODAL STATE ---
   const [activeTab, setActiveTab] = useState("Meals");
   const [showMealModal, setShowMealModal] = useState(false);
   const [showBazarModal, setShowBazarModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString());
   const selectedMonth = selectedDate.slice(0, 7);
-  const currentMonthKey = new Date().toISOString().slice(0, 7);
-  const currentDay = new Date().getDate();
-  const canResetMonth = currentDay >= 26;
+  const currentMonthKey = getLocalMonthKey();
+  const isAdmin = userData?.role === "admin";
 
   // --- 3. FORM STATES ---
   const [mealForm, setMealForm] = useState({
@@ -119,7 +132,10 @@ export default function ManageMess() {
         fetch("/api/payments")
       ]);
 
-      if (membersRes.ok) setMembers(await membersRes.json());
+      if (membersRes.ok) {
+        const data = await membersRes.json();
+        setMembers(Array.isArray(data) ? data.filter((member: Member) => member.role !== "admin") : []);
+      }
       if (mealsRes.ok) setMeals(await mealsRes.json());
       if (bazarsRes.ok) setBazars(await bazarsRes.json());
       if (paymentsRes.ok) setPayments(await paymentsRes.json());
@@ -189,49 +205,6 @@ export default function ManageMess() {
       alert("Failed to save rent bills.");
     } finally {
       setSavingRent(false);
-    }
-  };
-
-  const handleResetMonth = async () => {
-    if (userData?.role !== "admin") {
-      alert("Only admin can reset monthly data.");
-      return;
-    }
-
-    if (!canResetMonth) {
-      alert("Reset is available only from the 26th to the end of the month.");
-      return;
-    }
-
-    if (!confirm(`Reset meals, bazar, and payments for ${currentMonthKey}? This will archive the current month history first.`)) {
-      return;
-    }
-
-    setResettingData(true);
-    try {
-      const response = await fetch("/api/reset-history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          monthKey: currentMonthKey,
-          resetBy: userData?.username || "admin",
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        alert(data?.error || "Failed to reset monthly data.");
-        return;
-      }
-
-      await fetchData();
-      refreshStats();
-      alert("Monthly data reset successfully and saved to history.");
-    } catch (error) {
-      console.error("Error resetting monthly data:", error);
-      alert("Failed to reset monthly data.");
-    } finally {
-      setResettingData(false);
     }
   };
 
@@ -348,6 +321,7 @@ export default function ManageMess() {
   };
 
   const mealsByMember = meals.reduce((acc, meal) => {
+    if (meal.date && meal.date.slice(0, 7) !== selectedMonth) return acc;
     const memberId = meal.memberId?._id;
     if (!memberId) return acc;
     acc[memberId] = (acc[memberId] || 0) + (meal.total || 0);
@@ -355,6 +329,7 @@ export default function ManageMess() {
   }, {} as Record<string, number>);
 
   const bazarsByMember = bazars.reduce((acc, bazar) => {
+    if (bazar.date && bazar.date.slice(0, 7) !== selectedMonth) return acc;
     const memberId = getBazarMemberId(bazar.memberId);
     if (!memberId) return acc;
     acc[memberId] = (acc[memberId] || 0) + getBazarAmount(bazar);
@@ -364,7 +339,7 @@ export default function ManageMess() {
   const totalRent = Number(rentBill.roomRent || 0) + Number(rentBill.wifiBill || 0) + Number(rentBill.buaBill || 0);
 
   const getGiveTakeValue = (memberId: string): number => {
-    const mealCost = (mealsByMember[memberId] || 0) * globalStats.mealRate;
+    const mealCost = (mealsByMember[memberId] || 0) * monthlyMealRate;
     const memberBazar = bazarsByMember[memberId] || 0;
     return mealCost - memberBazar;
   };
@@ -372,12 +347,26 @@ export default function ManageMess() {
   const monthlyPaidMemberIds = new Set(
     payments
       .filter((p) => {
-        if (p.status !== "completed") return false;
         const paidMonth = p.paidDate ? p.paidDate.slice(0, 7) : "";
-        return p.monthKey === selectedMonth || paidMonth === selectedMonth;
+        const isMonthMatch = p.monthKey === selectedMonth || paidMonth === selectedMonth;
+        if (!isMonthMatch) return false;
+        if (p.status !== "completed") return false;
+        return true;
       })
       .map((p) => p.memberId?._id)
   );
+
+  const monthlyPaymentByMember = payments.reduce((acc, payment) => {
+    const paidMonth = payment.paidDate ? payment.paidDate.slice(0, 7) : "";
+    const isMonthMatch = payment.monthKey === selectedMonth || paidMonth === selectedMonth;
+    if (!isMonthMatch || payment.status !== "completed") return acc;
+    const memberId = payment.memberId?._id;
+    if (!memberId) return acc;
+    if (!acc[memberId]) {
+      acc[memberId] = payment;
+    }
+    return acc;
+  }, {} as Record<string, Payment>);
 
   const todaysMeals = meals.filter((m) => m.date.startsWith(selectedDate));
   const todaysBazars = bazars.filter((b) => b.date.startsWith(selectedDate));
@@ -385,10 +374,10 @@ export default function ManageMess() {
   const totalBazarToday = todaysBazars.reduce((sum, b) => sum + (typeof b.total === "number" ? b.total : b.price), 0);
 
   const monthlyExpenseRows = members.map((member) => {
-    const monthlyExpense = totalRent + getGiveTakeValue(member._id);
+    const summaryBalance = totalRent + getGiveTakeValue(member._id);
     return {
       member,
-      monthlyExpense,
+      summaryBalance,
       isPaid: monthlyPaidMemberIds.has(member._id),
     };
   });
@@ -438,6 +427,87 @@ export default function ManageMess() {
     }
   };
 
+  const handleEditMonthlyPayment = async (payment: Payment) => {
+    if (!isAdmin) {
+      alert("Only admin can edit payment records.");
+      return;
+    }
+
+    const nextStatus = window.prompt("Enter status (completed, pending, cancelled, failed)", payment.status || "completed");
+    if (nextStatus === null) return;
+
+    const nextAmountInput = window.prompt("Enter amount", String(payment.amount || 0));
+    if (nextAmountInput === null) return;
+
+    const nextDescription = window.prompt("Enter description", payment.description || `Monthly expense payment for ${selectedMonth}`);
+    if (nextDescription === null) return;
+
+    if (!confirm(`Save changes for ${payment.memberId?.username || "this member"}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/payments?id=${payment._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: nextStatus,
+          amount: Number(nextAmountInput),
+          description: nextDescription,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data?.error || "Failed to update payment.");
+        return;
+      }
+
+      await fetchData();
+      refreshStats();
+      setPaymentChecks((prev) => ({ ...prev, [payment.memberId._id]: false }));
+      alert("Payment updated successfully.");
+    } catch (error) {
+      console.error("Error updating payment:", error);
+      alert("Failed to update payment.");
+    }
+  };
+
+  const handleCancelMonthlyPayment = async (payment: Payment) => {
+    if (!isAdmin) {
+      alert("Only admin can cancel payment records.");
+      return;
+    }
+
+    if (!confirm(`Cancel payment for ${payment.memberId?.username || "this member"}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/payments?id=${payment._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "cancelled",
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data?.error || "Failed to cancel payment.");
+        return;
+      }
+
+      await fetchData();
+      refreshStats();
+      setPaymentChecks((prev) => ({ ...prev, [payment.memberId._id]: false }));
+      alert("Payment cancelled.");
+    } catch (error) {
+      console.error("Error cancelling payment:", error);
+      alert("Failed to cancel payment.");
+    }
+  };
+
   // --- 8. CALCULATE STATS ---
   const stats = [
     { title: "Total Meals Today", value: totalMealsToday.toFixed(1), icon: <Utensils color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
@@ -464,21 +534,7 @@ export default function ManageMess() {
             style={{ background: "rgba(255,255,255,0.1)", border: "none", padding: "6px 12px", borderRadius: "8px", color: "#fff", cursor: "pointer" }}
           />
           <span style={styles.changeTerm}>{userData?.username || "User"}</span>
-          {userData?.role === "admin" && (
-            <button
-              onClick={handleResetMonth}
-              disabled={!canResetMonth || resettingData}
-              style={{
-                ...styles.btnReset,
-                opacity: !canResetMonth || resettingData ? 0.55 : 1,
-                cursor: !canResetMonth || resettingData ? "not-allowed" : "pointer",
-              }}
-            >
-              {resettingData ? "Resetting..." : canResetMonth ? "Reset Month" : "Reset Locked"}
-            </button>
-          )}
         </div>
-        <p style={styles.resetHint}>{canResetMonth ? "Reset is enabled for this month." : "Reset is locked from day 1 to 25."}</p>
       </header>
 
       {/* STATS SECTION */}
@@ -726,7 +782,7 @@ export default function ManageMess() {
                     <tr key={row.member._id} style={styles.tableRow}>
                       <td style={styles.td}>{selectedDate}</td>
                       <td style={styles.td}>{row.member.username}</td>
-                      <td style={{ ...styles.td, fontWeight: 700 }}>৳{row.monthlyExpense.toFixed(2)}</td>
+                      <td style={{ ...styles.td, fontWeight: 700 }}>৳{row.summaryBalance.toFixed(2)}</td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <input
                           type="checkbox"
@@ -741,16 +797,35 @@ export default function ManageMess() {
                         />
                       </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
-                        {row.isPaid ? (
-                          <span style={styles.paidBadge}>Paid</span>
-                        ) : (
-                          <button
-                            style={styles.btnConfirmPayment}
-                            onClick={() => handleConfirmMonthlyPayment(row.member._id, row.monthlyExpense)}
-                          >
-                            Confirm Payment
-                          </button>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+                          {row.isPaid ? (
+                            <span style={styles.paidBadge}>Paid</span>
+                          ) : (
+                            <button
+                              style={styles.btnConfirmPayment}
+                              onClick={() => handleConfirmMonthlyPayment(row.member._id, row.summaryBalance)}
+                            >
+                              Confirm Payment
+                            </button>
+                          )}
+
+                          {monthlyPaymentByMember[row.member._id] ? (
+                            <>
+                              <button
+                                style={styles.btnEditPayment}
+                                onClick={() => handleEditMonthlyPayment(monthlyPaymentByMember[row.member._id])}
+                              >
+                                <Edit3 size={14} /> Edit
+                              </button>
+                              <button
+                                style={styles.btnCancelPayment}
+                                onClick={() => handleCancelMonthlyPayment(monthlyPaymentByMember[row.member._id])}
+                              >
+                                <X size={14} /> Cancel
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -998,7 +1073,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   termText: { color: "#fff", fontWeight: "500", fontSize: "14px" },
   changeTerm: { color: "rgba(255,255,255,0.7)", fontSize: "12px", cursor: "pointer", marginLeft: "20px" },
-  resetHint: { color: "#94a3b8", margin: "10px 0 0 0", fontSize: "12px" },
 
   statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px", marginBottom: "30px" },
   statCard: { padding: "20px", borderRadius: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff" },
@@ -1019,8 +1093,9 @@ const styles: { [key: string]: React.CSSProperties } = {
   btnAddMeal: { background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "10px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", fontWeight: "600" },
   btnAddBazar: { background: "#9a3412", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "10px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", fontWeight: "600" },
   btnConfirmPayment: { background: "#16a34a", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" },
+  btnEditPayment: { background: "rgba(59,130,246,0.14)", color: "#bfdbfe", border: "1px solid rgba(59,130,246,0.35)", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "6px" },
+  btnCancelPayment: { background: "rgba(239,68,68,0.14)", color: "#fecaca", border: "1px solid rgba(239,68,68,0.35)", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "6px" },
   paidBadge: { background: "rgba(34,197,94,0.15)", color: "#22c55e", padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: "700" },
-  btnReset: { background: "rgba(239,68,68,0.18)", color: "#fecaca", border: "1px solid rgba(239,68,68,0.35)", padding: "8px 14px", borderRadius: "10px", fontWeight: "700" },
 
   emptyState: { display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "60px 0", color: "#475569" },
   

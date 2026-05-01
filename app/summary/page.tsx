@@ -13,12 +13,14 @@ interface Member {
 interface MealRecord {
   _id: string;
   memberId: { _id: string };
+  date?: string;
   total: number;
 }
 
 interface BazarRecord {
   _id: string;
   memberId: string | { _id?: string };
+  date?: string;
   total?: number;
   quantity?: number;
   price?: number;
@@ -38,31 +40,21 @@ export default function SummaryPage() {
   const [loading, setLoading] = useState(true);
   const { stats } = useGlobalStats();
 
+  const getLocalMonthKey = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${year}-${month}`;
+  };
+  const currentMonthKey = getLocalMonthKey();
+
   useEffect(() => {
     const fetchMembers = async () => {
       try {
         const res = await fetch("/api/members");
         const data = await res.json();
-        const saved = localStorage.getItem("mess_user");
-        const currentUser = saved ? JSON.parse(saved) : null;
-        let updatedList = Array.isArray(data) ? data : [];
-
-        if (currentUser && currentUser.role === "admin") {
-          const isAdminInList = updatedList.some(
-            (m: Member) => m.username.toLowerCase() === currentUser.username.toLowerCase()
-          );
-          if (!isAdminInList) {
-            updatedList = [
-              { 
-                _id: "admin-temp-id", 
-                username: currentUser.username, 
-                email: currentUser.email || "admin@system.com", 
-                role: "admin" 
-              }, 
-              ...updatedList
-            ];
-          }
-        }
+        const updatedList = Array.isArray(data)
+          ? data.filter((member: Member) => member.role !== "admin")
+          : [];
         setMembers(updatedList);
       } catch (err) {
         console.error("Error fetching members:", err);
@@ -97,7 +89,7 @@ export default function SummaryPage() {
 
     const fetchRentBill = async () => {
       try {
-        const monthKey = new Date().toISOString().slice(0, 7);
+        const monthKey = getLocalMonthKey();
         const monthRes = await fetch(`/api/rent?month=${monthKey}`);
         if (monthRes.ok) {
           const monthData = (await monthRes.json()) as RentBill | null;
@@ -128,6 +120,7 @@ export default function SummaryPage() {
   }, []);
 
   const mealsByMember = meals.reduce((acc, meal) => {
+    if (meal.date && meal.date.slice(0, 7) !== currentMonthKey) return acc;
     const memberId = meal.memberId?._id;
     if (!memberId) return acc;
     acc[memberId] = (acc[memberId] || 0) + (meal.total || 0);
@@ -149,14 +142,19 @@ export default function SummaryPage() {
   };
 
   const bazarsByMember = bazars.reduce((acc, bazar) => {
+    if (bazar.date && bazar.date.slice(0, 7) !== currentMonthKey) return acc;
     const memberId = getRecordMemberId(bazar.memberId);
     if (!memberId) return acc;
     acc[memberId] = (acc[memberId] || 0) + getBazarAmount(bazar);
     return acc;
   }, {} as Record<string, number>);
 
+  const totalMealsFiltered = Object.values(mealsByMember).reduce((s, v) => s + v, 0);
+  const totalBazarFiltered = Object.values(bazarsByMember).reduce((s, v) => s + v, 0);
+  const currentMealRate = totalMealsFiltered > 0 ? totalBazarFiltered / totalMealsFiltered : 0;
+
   const getGiveTake = (memberId: string): { value: number; label: string } => {
-    const mealCost = (mealsByMember[memberId] || 0) * stats.mealRate;
+    const mealCost = (mealsByMember[memberId] || 0) * currentMealRate;
     const totalBazar = bazarsByMember[memberId] || 0;
     
     if (totalBazar > mealCost) {
@@ -180,7 +178,9 @@ export default function SummaryPage() {
     <div style={{ animation: "fadeIn 0.5s", width: "100%", paddingRight: "20px" }}>
       <header style={{ marginBottom: "30px" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold", margin: 0, color: "#f8fafc" }}>Summary</h1>
-        <p style={{ color: "#94a3b8", marginTop: "5px" }}>Comprehensive member meal and cost tracking</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 5 }}>
+          <p style={{ color: "#94a3b8", margin: 0 }}>Comprehensive member meal and cost tracking</p>
+        </div>
       </header>
 
       {/* STATS SECTION - NOW WITH VIOLET GRADIENT BOXES */}

@@ -5,9 +5,25 @@ import Meal from '@/lib/models/Meal';
 import Bazar from '@/lib/models/Bazar';
 import Payment from '@/lib/models/Payment';
 
+const getLocalMonthKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+};
+
+const getMonthBounds = (monthKey: string) => {
+  const [year, month] = monthKey.split('-').map(Number);
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+  return { startDate, endDate };
+};
+
 export async function GET() {
   try {
     await dbConnect();
+
+    const monthKey = getLocalMonthKey();
+    const { startDate, endDate } = getMonthBounds(monthKey);
 
     const [
       totalMembers,
@@ -15,8 +31,11 @@ export async function GET() {
       bazarAgg,
       paymentAgg,
     ] = await Promise.all([
-      Member.countDocuments({}),
+      Member.countDocuments({ role: { $ne: 'admin' } }),
       Meal.aggregate([
+        {
+          $match: { date: { $gte: startDate, $lt: endDate } },
+        },
         {
           $group: {
             _id: null,
@@ -26,6 +45,9 @@ export async function GET() {
       ]),
       Bazar.aggregate([
         {
+          $match: { date: { $gte: startDate, $lt: endDate } },
+        },
+        {
           $group: {
             _id: null,
             total: { $sum: '$total' },
@@ -33,6 +55,15 @@ export async function GET() {
         },
       ]),
       Payment.aggregate([
+        {
+          $match: {
+            status: 'completed',
+            $or: [
+              { monthKey },
+              { paidDate: { $gte: startDate, $lt: endDate } },
+            ],
+          },
+        },
         {
           $group: {
             _id: null,
@@ -53,6 +84,7 @@ export async function GET() {
       totalBazar,
       totalPayments,
       mealRate,
+      monthKey,
     });
   } catch (error: any) {
     console.error('Error fetching stats:', error);

@@ -24,3 +24,102 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Responsive breakpoints and helpers (4 breakpoints)
+   xl: 1280px and up
+   lg: 1024px - 1279px
+   md: 768px - 1023px
+   sm: 0 - 767px
+*/
+
+:root {
+  --container-max-width-xl: 1200px;
+  --container-max-width-lg: 1000px;
+  --container-max-width-md: 720px;
+  --container-max-width-sm: 100%;
+
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 20px;
+  --space-lg: 28px;
+  --space-xl: 40px;
+
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+}
+
+/* Responsive container centered */
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-md);
+  padding-right: var(--space-md);
+}
+
+@media (min-width: 1280px) {
+  .container { max-width: var(--container-max-width-xl); padding-left: var(--space-xl); padding-right: var(--space-xl); }
+  :root { --app-font-size: var(--font-size-xl); }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .container { max-width: var(--container-max-width-lg); padding-left: var(--space-lg); padding-right: var(--space-lg); }
+  :root { --app-font-size: var(--font-size-lg); }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .container { max-width: var(--container-max-width-md); padding-left: var(--space-md); padding-right: var(--space-md); }
+  :root { --app-font-size: var(--font-size-md); }
+}
+
+@media (max-width: 767px) {
+  .container { max-width: var(--container-max-width-sm); padding-left: var(--space-sm); padding-right: var(--space-sm); }
+  :root { --app-font-size: var(--font-size-sm); }
+}
+
+/* Responsive helpers */
+.responsive-row { display: flex; gap: var(--space-md); align-items: center; }
+.responsive-column { display: flex; flex-direction: column; gap: var(--space-md); }
+
+/* Breakpoint-aware helpers (switch to column on small screens) */
+@media (max-width: 1023px) {
+  .responsive-row.stack-md { flex-direction: column; align-items: stretch; }
+}
+
+@media (max-width: 639px) {
+  .responsive-row.stack-sm { flex-direction: column; align-items: stretch; }
+}
+
+/* Responsive grid helper: provide simple columns up to 4 */
+.grid-cols-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-md); }
+@media (max-width: 1279px) { .grid-cols-4 { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1023px) { .grid-cols-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 639px) { .grid-cols-4 { grid-template-columns: 1fr; } }
+
+/* Utility: hide on small screens */
+.hide-sm { display: block; }
+@media (max-width: 639px) { .hide-sm { display: none !important; } }
+
+/* Make images and cards responsive */
+.img-responsive { max-width: 100%; height: auto; }
+.card-responsive { width: 100%; box-sizing: border-box; }
+
+/* Ensure base font-size adapts */
+html { font-size: var(--app-font-size, 16px); }
+
+/* Layout-specific responsive tweaks for the app shell */
+.app-root .sidebar { transition: all 0.2s ease; }
+@media (max-width: 1023px) {
+  /* Hide sidebar on tablet and smaller, allow full-width main content */
+  .app-root .sidebar { display: none !important; }
+  .app-root .container { padding-left: var(--space-md); padding-right: var(--space-md); }
+  .app-root .topRightActions { right: var(--space-md); top: var(--space-sm); }
+}
+
+@media (max-width: 639px) {
+  .app-root .topRightActions { right: var(--space-sm); top: var(--space-sm); }
+  .app-root .username { display: none; }
+}
+

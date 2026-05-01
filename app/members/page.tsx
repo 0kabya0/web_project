@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { 
-  Users, Crown, ShieldCheck, Search, Edit2, Filter, Save, X, Trash2
+  Users, ShieldCheck, Search, Edit2, Filter, Save, X, Trash2
 } from "lucide-react";
 import { useGlobalStats } from "@/hooks/useGlobalStats";
 
@@ -140,7 +140,6 @@ export default function MembersManagement() {
 
   const stats = {
     total: globalStats.totalMembers,
-    superAdmins: members.filter(m => m.role === 'admin').length,
     regularMembers: members.length
   };
 
@@ -180,16 +179,6 @@ export default function MembersManagement() {
           </div>
           <div style={styles.iconBoxGlass}>
             <Users color="#fff" size={24} />
-          </div>
-        </div>
-
-        <div style={styles.statCardGradient}>
-          <div>
-            <p style={styles.statLabelLight}>Super Admins</p>
-            <h2 style={styles.statValue}>{stats.superAdmins}</h2>
-          </div>
-          <div style={styles.iconBoxGlass}>
-            <Crown color="#fff" size={24} />
           </div>
         </div>
 

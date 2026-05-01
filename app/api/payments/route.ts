@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
     if (memberId) filter.memberId = memberId;
     if (month) {
       const [year, mon] = month.split('-').map(Number);
-      const startDate = new Date(Date.UTC(year, mon - 1, 1));
-      const endDate = new Date(Date.UTC(year, mon, 1));
+      const startDate = new Date(year, mon - 1, 1);
+      const endDate = new Date(year, mon, 1);
       filter.$or = [
         { monthKey: month },
         { paidDate: { $gte: startDate, $lt: endDate } },
@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
     }
 
     const [year, mon] = String(body.monthKey).split('-').map(Number);
-    const startDate = new Date(Date.UTC(year, mon - 1, 1));
-    const endDate = new Date(Date.UTC(year, mon, 1));
+    const startDate = new Date(year, mon - 1, 1);
+    const endDate = new Date(year, mon, 1);
 
     const existingMonthlyPayment = await Payment.findOne({
       memberId: body.memberId,
@@ -92,6 +92,63 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(payment, { status: 201 });
   } catch (error: any) {
     console.error('Error creating payment:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    await dbConnect();
+
+    const searchParams = request.nextUrl.searchParams;
+    const paymentId = searchParams.get('id');
+    const body = await request.json();
+
+    if (!paymentId) {
+      return NextResponse.json({ error: 'payment id is required' }, { status: 400 });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (body.amount !== undefined) updates.amount = Number(body.amount);
+    if (body.description !== undefined) updates.description = String(body.description);
+    if (body.status !== undefined) updates.status = String(body.status);
+    if (body.paidDate !== undefined) updates.paidDate = new Date(body.paidDate);
+    if (body.monthKey !== undefined) updates.monthKey = String(body.monthKey);
+    if (body.notes !== undefined) updates.notes = String(body.notes);
+
+    const updatedPayment = await Payment.findByIdAndUpdate(paymentId, updates, { new: true })
+      .populate('memberId', 'username email');
+
+    if (!updatedPayment) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(updatedPayment);
+  } catch (error: any) {
+    console.error('Error updating payment:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    await dbConnect();
+
+    const searchParams = request.nextUrl.searchParams;
+    const paymentId = searchParams.get('id');
+
+    if (!paymentId) {
+      return NextResponse.json({ error: 'payment id is required' }, { status: 400 });
+    }
+
+    const deletedPayment = await Payment.findByIdAndDelete(paymentId);
+    if (!deletedPayment) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, deletedPayment });
+  } catch (error: any) {
+    console.error('Error deleting payment:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

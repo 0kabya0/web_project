@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { ShoppingCart, Filter, Package } from "lucide-react";
+import { ShoppingCart, Filter, Package, Calendar } from "lucide-react";
 import { useGlobalStats } from "@/hooks/useGlobalStats";
 
 interface BazarRecord {
@@ -21,6 +21,7 @@ interface Member {
 export default function BazarPage() {
   const { stats } = useGlobalStats();
   const [selectedMember, setSelectedMember] = useState("All");
+  const [selectedDate, setSelectedDate] = useState("");
   const [bazarHistory, setBazarHistory] = useState<BazarRecord[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +75,9 @@ export default function BazarPage() {
       (b) => getMemberName(b.memberId) === selectedMember
     );
   }
+  if (selectedDate) {
+    filteredBazar = filteredBazar.filter((b) => b.date.startsWith(selectedDate));
+  }
 
   // Calculate total amount for filtered records
   const totalAmount = filteredBazar.reduce((sum, b) => sum + (b.price * b.quantity), 0);
@@ -121,6 +125,28 @@ export default function BazarPage() {
             ))}
           </select>
         </div>
+
+          <div style={dateWrapperStyle}>
+            <Calendar size={18} color="#94a3b8" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              style={dateStyle}
+            />
+          </div>
+
+          {(selectedMember !== "All" || selectedDate) && (
+            <button
+              onClick={() => {
+                setSelectedMember("All");
+                setSelectedDate("");
+              }}
+              style={clearButtonStyle}
+            >
+              Clear Filters
+            </button>
+          )}
       </div>
 
       {/* BAZAR HISTORY TABLE CONTAINER - Color Updated to Dark UI */}
@@ -207,6 +233,7 @@ const iconWrapperStyle: React.CSSProperties = {
 
 const filterBarStyle: React.CSSProperties = {
   display: "flex",
+  gap: "15px",
   marginBottom: "25px"
 };
 
@@ -229,6 +256,36 @@ const selectStyle: React.CSSProperties = {
   background: "transparent",
   fontSize: "14px",
   cursor: "pointer"
+};
+
+const dateWrapperStyle: React.CSSProperties = {
+  background: "#0f172a",
+  padding: "12px 18px",
+  borderRadius: "14px",
+  width: "220px",
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  border: "1px solid #1e293b"
+};
+
+const dateStyle: React.CSSProperties = {
+  border: "none",
+  outline: "none",
+  width: "100%",
+  color: "#cbd5e1",
+  background: "transparent",
+  cursor: "pointer"
+};
+
+const clearButtonStyle: React.CSSProperties = {
+  background: "#1e293b",
+  color: "#94a3b8",
+  border: "1px solid #334155",
+  padding: "12px 15px",
+  borderRadius: "12px",
+  cursor: "pointer",
+  fontSize: "14px",
 };
 
 const tableContainerStyle: React.CSSProperties = {

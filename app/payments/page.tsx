@@ -9,6 +9,7 @@ interface PaymentRecord {
   paidDate: string;
   description: string;
   amount: number;
+  status?: string;
 }
 
 interface Member {
@@ -38,6 +39,7 @@ interface RentBill {
 
 export default function PaymentsPage() {
   const { stats } = useGlobalStats();
+  const [userRole, setUserRole] = useState("user");
   const [selectedMember, setSelectedMember] = useState("All");
   const [members, setMembers] = useState<Member[]>([]);
   const [meals, setMeals] = useState<MealRecord[]>([]);
@@ -46,11 +48,18 @@ export default function PaymentsPage() {
   const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getLocalMonthKey = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${year}-${month}`;
+  };
+  const currentMonthKey = getLocalMonthKey();
+
   useEffect(() => {
     const fetchPayments = async () => {
       try {
         setLoading(true);
-        const monthKey = new Date().toISOString().slice(0, 7);
+        const monthKey = getLocalMonthKey();
         const [paymentsRes, membersRes, mealsRes, bazarsRes, rentMonthRes, rentLatestRes] = await Promise.all([
           fetch("/api/payments"),
           fetch("/api/members"),
@@ -96,6 +105,16 @@ export default function PaymentsPage() {
       }
     };
 
+    const saved = localStorage.getItem("mess_user");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setUserRole(parsed?.role || "user");
+      } catch {
+        setUserRole("user");
+      }
+    }
+
     fetchPayments();
   }, []);
 
@@ -124,21 +143,31 @@ export default function PaymentsPage() {
 
   const mealsByMember = useMemo(() => {
     return meals.reduce((acc, meal) => {
+      if (String((meal as any).date || "").slice(0, 7) !== currentMonthKey) return acc;
       const memberId = meal.memberId?._id;
       if (!memberId) return acc;
       acc[memberId] = (acc[memberId] || 0) + (meal.total || 0);
       return acc;
     }, {} as Record<string, number>);
-  }, [meals]);
+  }, [meals, currentMonthKey]);
 
   const bazarsByMember = useMemo(() => {
     return bazars.reduce((acc, bazar) => {
+      if (String((bazar as any).date || "").slice(0, 7) !== currentMonthKey) return acc;
       const memberId = getRecordMemberId(bazar.memberId);
       if (!memberId) return acc;
       acc[memberId] = (acc[memberId] || 0) + getBazarAmount(bazar);
       return acc;
     }, {} as Record<string, number>);
-  }, [bazars]);
+  }, [bazars, currentMonthKey]);
+
+  const monthPayments = useMemo(() => {
+    return paymentHistory.filter((payment) => {
+      const monthFromPaidDate = payment.paidDate ? String(payment.paidDate).slice(0, 7) : "";
+      const monthKey = (payment as any).monthKey || monthFromPaidDate;
+      return monthKey === currentMonthKey;
+    });
+  }, [paymentHistory, currentMonthKey]);
 
   const getGiveTakeValue = (memberId: string): number => {
     const mealCost = (mealsByMember[memberId] || 0) * stats.mealRate;
@@ -150,12 +179,13 @@ export default function PaymentsPage() {
 
   const paidMemberIds = useMemo(() => {
     const ids = new Set<string>();
-    paymentHistory.forEach((payment) => {
+    monthPayments.forEach((payment) => {
+      if (payment.status !== "completed") return;
       const memberId = payment.memberId?._id;
       if (memberId) ids.add(memberId);
     });
     return ids;
-  }, [paymentHistory]);
+  }, [monthPayments]);
 
   const totalPaidBalance = useMemo(() => {
     return members
@@ -164,9 +194,9 @@ export default function PaymentsPage() {
   }, [members, paidMemberIds, totalRent, mealsByMember, bazarsByMember, stats.mealRate]);
 
   const filteredPayments = useMemo(() => {
-    if (selectedMember === "All") return paymentHistory;
-    return paymentHistory.filter((item) => item.memberId?.username === selectedMember);
-  }, [paymentHistory, selectedMember]);
+    if (selectedMember === "All") return monthPayments;
+    return monthPayments.filter((item) => item.memberId?.username === selectedMember);
+  }, [monthPayments, selectedMember]);
 
   return (
     <div style={{ animation: "fadeIn 0.5s", color: "#f8fafc", paddingBottom: "40px", width: "100%", boxSizing: "border-box", paddingRight: "10px" }}>
@@ -240,7 +270,12 @@ export default function PaymentsPage() {
                   <tr key={item._id} style={trStyle}>
                     <td style={tdStyle}>{item.memberId?.username || "Unknown"}</td>
                     <td style={tdStyle}>{new Date(item.paidDate).toLocaleDateString()}</td>
-                    <td style={tdStyle}>{item.description || "Monthly expense payment"}</td>
+                    <td style={tdStyle}>
+                      {item.description || "Monthly expense payment"}
+                      {item.status && item.status !== "completed" ? (
+                        <span style={{ color: "#f59e0b" }}> ({item.status})</span>
+                      ) : null}
+                    </td>
                     <td style={{ ...tdStyle, textAlign: "right", paddingRight: "20px", fontWeight: "bold", color: getMemberBalance(item.memberId?._id || "") >= 0 ? "#22c55e" : "#f87171" }}>
                       ৳{getMemberBalance(item.memberId?._id || "").toFixed(2)}
                     </td>

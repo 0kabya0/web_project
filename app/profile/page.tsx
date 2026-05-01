@@ -1,11 +1,18 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { Mail, Calendar, TrendingUp } from "lucide-react";
+import { Mail, Calendar, Edit2, Save, X, UtensilsCrossed, ShoppingBag, TrendingUp, Home, Wallet, Soup } from "lucide-react";
 import { useGlobalStats } from "@/hooks/useGlobalStats";
 
 interface Member {
   _id: string;
   username: string;
+  email?: string;
+  role?: string;
+  phone?: string | null;
+  roomNumber?: string | null;
+  address?: string | null;
+  isActive?: boolean;
+  createdAt?: string;
 }
 
 interface MealRecord {
@@ -39,6 +46,82 @@ interface RentBill {
   buaBill?: number;
 }
 
+// --- STYLES - Define before component ---
+
+const editButtonStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  padding: "8px 14px",
+  borderRadius: "10px",
+  border: "1px solid #4f46e5",
+  background: "linear-gradient(120deg, #4f46e5 0%, #7c3aed 100%)",
+  color: "#ffffff",
+  fontSize: "13px",
+  fontWeight: "600",
+  cursor: "pointer",
+  boxShadow: "0 4px 12px rgba(79, 70, 229, 0.3)",
+};
+
+const editFormStyle: React.CSSProperties = {
+  background: "rgba(79, 70, 229, 0.05)",
+  padding: "18px",
+  borderRadius: "12px",
+  border: "1px solid rgba(79, 70, 229, 0.2)",
+  marginBottom: "18px"
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  marginBottom: "6px",
+  color: "#cbd5e1",
+  fontSize: "13px",
+  fontWeight: "600"
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: "8px",
+  border: "1px solid #334155",
+  background: "rgba(15, 23, 42, 0.5)",
+  color: "#f8fafc",
+  fontSize: "14px",
+  boxSizing: "border-box",
+  fontFamily: "inherit"
+};
+
+const saveButtonStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  flex: 1,
+  padding: "10px 14px",
+  borderRadius: "8px",
+  border: "none",
+  background: "linear-gradient(120deg, #4f46e5 0%, #7c3aed 100%)",
+  color: "#ffffff",
+  fontSize: "13px",
+  fontWeight: "600",
+  cursor: "pointer",
+  boxShadow: "0 4px 12px rgba(79, 70, 229, 0.3)",
+};
+
+const cancelButtonStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  flex: 1,
+  padding: "10px 14px",
+  borderRadius: "8px",
+  border: "1px solid #334155",
+  background: "transparent",
+  color: "#94a3b8",
+  fontSize: "13px",
+  fontWeight: "600",
+  cursor: "pointer",
+};
+
 export default function ProfilePage() {
   const { stats } = useGlobalStats();
   const [userData, setUserData] = useState({ username: "Guest", email: "user@example.com", role: "Member", status: "Active" });
@@ -47,17 +130,25 @@ export default function ProfilePage() {
   const [bazars, setBazars] = useState<BazarRecord[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [rentBill, setRentBill] = useState<RentBill>({ roomRent: 0, wifiBill: 0, buaBill: 0 });
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ phone: "", roomNumber: "", address: "" });
+  const [isSaving, setIsSaving] = useState(false);
+  const [allMembers, setAllMembers] = useState<Member[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState("");
 
   // Load user data from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("mess_user");
     if (saved) {
       const parsed = JSON.parse(saved);
+      const isAdminUser = parsed.role === "admin";
+      setIsAdmin(isAdminUser);
       setUserData({
-        username: parsed.role === "admin" ? `${parsed.username} - Manager` : (parsed.username || "User"),
+        username: isAdminUser ? `${parsed.username} - Manager` : (parsed.username || "User"),
         email: parsed.email || `${parsed.username?.toLowerCase().replace(/\s/g, "")}@gmail.com`,
-        role: parsed.role === "admin" ? "Admin - Manager" : "Member",
-        status: parsed.status || (parsed.role === "admin" ? "Approved" : "Active")
+        role: isAdminUser ? "Admin - Manager" : "Member",
+        status: parsed.status || (isAdminUser ? "Approved" : "Active")
       });
 
       const fetchProfileData = async () => {
@@ -73,8 +164,19 @@ export default function ProfilePage() {
 
           if (membersRes.ok) {
             const membersData = (await membersRes.json()) as Member[];
+            const nonAdminMembers = membersData.filter((m) => m.role !== "admin");
+            setAllMembers(nonAdminMembers);
             const currentMember = membersData.find((m) => (m.username || "").toLowerCase() === (parsed.username || "").toLowerCase());
             setMemberId(currentMember?._id || "");
+            
+            // Set edit form with member data
+            if (currentMember && !isAdminUser) {
+              setEditForm({
+                phone: (currentMember as any).phone || "",
+                roomNumber: (currentMember as any).roomNumber || "",
+                address: (currentMember as any).address || ""
+              });
+            }
           }
           if (mealsRes.ok) {
             const data = await mealsRes.json();
@@ -165,6 +267,53 @@ export default function ProfilePage() {
   const isPaid = memberBalance <= 0 || memberPaid >= memberBalance;
   const monthLabel = new Date(`${currentMonthKey}-01`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
 
+  const selectedMember = useMemo(
+    () => allMembers.find((m) => m._id === selectedMemberId) || null,
+    [allMembers, selectedMemberId]
+  );
+
+  const adminViewMemberMeals = useMemo(() => {
+    if (!selectedMemberId) return 0;
+    return monthMeals
+      .filter((meal) => getIdFromRef(meal.memberId) === selectedMemberId)
+      .reduce((sum, meal) => sum + Number(meal.total || 0), 0);
+  }, [monthMeals, selectedMemberId]);
+
+  const adminViewMemberBazar = useMemo(() => {
+    if (!selectedMemberId) return 0;
+    return monthBazars
+      .filter((entry) => getIdFromRef(entry.memberId) === selectedMemberId)
+      .reduce((sum, entry) => sum + getBazarAmount(entry), 0);
+  }, [monthBazars, selectedMemberId]);
+
+  const adminViewMemberMealCost = adminViewMemberMeals * monthMealRate;
+  const adminViewMemberBalance = totalRent + (adminViewMemberMealCost - adminViewMemberBazar);
+
+  const handleEditMember = async () => {
+    if (!memberId) return;
+    
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/members/${memberId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+
+      if (res.ok) {
+        setIsEditing(false);
+        alert('Profile updated successfully');
+      } else {
+        alert('Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Error updating profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div style={{ animation: "fadeIn 0.5s", paddingBottom: "40px", width: "100%", boxSizing: "border-box", paddingRight: "10px" }}>
       {/* HEADER SECTION */}
@@ -197,81 +346,196 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-        <div style={balanceContainerStyle}>
-          <p style={{ margin: 0, color: "#ffffff", opacity: 0.8, fontSize: "13px", fontWeight: "600" }}>Total Balance</p>
-          <h2 style={{ margin: 0, fontSize: "32px", fontWeight: "800", color: "#ffffff" }}>{memberBalance >= 0 ? "" : "-"}৳{Math.abs(memberBalance).toFixed(2)}</h2>
-        </div>
       </div>
 
       <div style={memberInfoCardStyle}>
-        <div style={{ marginBottom: "18px" }}>
-          <h3 style={{ margin: 0, color: "#f8fafc", fontSize: "18px", fontWeight: "700" }}>Sign In / Sign Up Information</h3>
-          <p style={{ margin: "5px 0 0 0", color: "#94a3b8", fontSize: "14px" }}>Your member account details from the current session</p>
-        </div>
-        <div style={memberInfoGridStyle}>
-          <InfoRow label="Member Name" value={userData.username} />
-          <InfoRow label="Email" value={userData.email} />
-          <InfoRow label="Role" value={userData.role} />
-          <InfoRow label="Status" value={userData.status} />
-          <InfoRow label="Current Manager" value="Admin" />
-          <InfoRow label="Access Type" value="Member Only" />
-        </div>
-      </div>
-
-      {/* TAB SECTION */}
-      <div style={{ marginBottom: "20px" }}>
-        <button style={activeTabStyle}>Term-wise History</button>
-      </div>
-
-      {/* FINANCIAL HISTORY TABLE */}
-      <div style={tableContainerStyle}>
-        <div style={{ marginBottom: "20px", color: "#94a3b8", fontSize: "14px" }}>
-          Total Members: {stats.totalMembers} | Total Meals: {stats.totalMeals.toFixed(1)}
-        </div>
-        <div style={{ marginBottom: "25px" }}>
-          <h3 style={{ margin: 0, color: "#f8fafc", fontSize: "18px", fontWeight: "700" }}>
-            Financial History by Manager Term
-          </h3>
-          <p style={{ margin: "5px 0 0 0", color: "#94a3b8", fontSize: "14px" }}>
-            Detailed breakdown for each manager's period
-          </p>
+        <div style={{ marginBottom: "18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h3 style={{ margin: 0, color: "#f8fafc", fontSize: "18px", fontWeight: "700" }}>Sign In / Sign Up Information</h3>
+            <p style={{ margin: "5px 0 0 0", color: "#94a3b8", fontSize: "14px" }}>Your member account details from the current session</p>
+          </div>
+          {!isAdmin && !isEditing && (
+            <button 
+              onClick={() => setIsEditing(true)}
+              style={editButtonStyle}
+            >
+              <Edit2 size={16} /> Edit
+            </button>
+          )}
         </div>
 
-        <div style={{ overflowX: "auto", width: "100%", borderRadius: "12px" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
-            <thead>
-              <tr style={tableHeaderRowStyle}>
-                <th style={thStyle}>Manager Term</th>
-                <th style={thStyle}>Meals</th>
-                <th style={thStyle}>Meal Rate</th>
-                <th style={thStyle}>Meal Cost</th>
-                <th style={thStyle}>Khala Bill</th>
-                <th style={thStyle}>Paid</th>
-                <th style={{ ...thStyle, textAlign: "right", paddingRight: "10px" }}>Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style={trStyle}>
-                <td style={tdStyle}>
-                  <div style={{ fontWeight: "700", color: "#f8fafc" }}>{userData.username}</div>
-                  <div style={{ fontSize: "12px", color: "#64748b" }}>{monthLabel}</div>
-                </td>
-                <td style={tdStyle}>{memberMeals.toFixed(1)}</td>
-                <td style={tdStyle}>৳{monthMealRate.toFixed(2)}</td>
-                <td style={tdStyle}>৳{memberMealCost.toFixed(2)}</td>
-                <td style={tdStyle}>৳{khalaBill.toFixed(2)}</td>
-                <td style={tdStyle}>
-                  <span style={isPaid ? paidBadgeStyle : notPaidBadgeStyle}>{isPaid ? "Paid" : "Not Paid"}</span>
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", color: memberBalance >= 0 ? "#10b981" : "#ef4444", fontWeight: "700", paddingRight: "10px" }}>
-                  <TrendingUp size={14} style={{ marginRight: "4px", display: "inline" }} />
-                  {memberBalance >= 0 ? "" : "-"}৳{Math.abs(memberBalance).toFixed(2)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        {isEditing && !isAdmin && (
+          <div style={editFormStyle}>
+            <div style={{ marginBottom: "15px" }}>
+              <label style={labelStyle}>Phone</label>
+              <input
+                type="tel"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                style={inputStyle}
+                placeholder="Enter phone number"
+              />
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={labelStyle}>Room Number</label>
+              <input
+                type="text"
+                value={editForm.roomNumber}
+                onChange={(e) => setEditForm({ ...editForm, roomNumber: e.target.value })}
+                style={inputStyle}
+                placeholder="Enter room number"
+              />
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={labelStyle}>Address</label>
+              <textarea
+                value={editForm.address}
+                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }}
+                placeholder="Enter address"
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button 
+                onClick={handleEditMember}
+                disabled={isSaving}
+                style={saveButtonStyle}
+              >
+                <Save size={16} /> {isSaving ? 'Saving...' : 'Save'}
+              </button>
+              <button 
+                onClick={() => setIsEditing(false)}
+                style={cancelButtonStyle}
+              >
+                <X size={16} /> Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isEditing && (
+          <div style={memberInfoGridStyle}>
+            <InfoRow label="Member Name" value={userData.username} />
+            <InfoRow label="Email" value={userData.email} />
+            {!isAdmin && <InfoRow label="Phone" value={editForm.phone || "Not provided"} />}
+            {!isAdmin && <InfoRow label="Room Number" value={editForm.roomNumber || "Not provided"} />}
+            {!isAdmin && <InfoRow label="Address" value={editForm.address || "Not provided"} />}
+            {isAdmin && <InfoRow label="Role" value={userData.role} />}
+            <InfoRow label="Status" value={userData.status} />
+          </div>
+        )}
       </div>
+
+      {isAdmin && (
+        <div style={memberInfoCardStyle}>
+          <div style={{ marginBottom: "18px" }}>
+            <div>
+              <h3 style={{ margin: 0, color: "#f8fafc", fontSize: "18px", fontWeight: "700" }}>Member Profile Viewer</h3>
+              <p style={{ margin: "5px 0 0 0", color: "#94a3b8", fontSize: "14px" }}>All members are listed below. Click a member to view profile and monthly summary.</p>
+            </div>
+          </div>
+
+          {allMembers.length > 0 ? (
+            <div style={adminViewerLayoutStyle}>
+              <div style={memberListPanelStyle}>
+                {allMembers.map((member) => {
+                  const isSelected = member._id === selectedMemberId;
+                  return (
+                    <button
+                      key={member._id}
+                      type="button"
+                      onClick={() => setSelectedMemberId((prev) => (prev === member._id ? "" : member._id))}
+                      style={isSelected ? selectedMemberListButtonStyle : memberListButtonStyle}
+                    >
+                      <span style={{ color: "#f8fafc", fontWeight: 700 }}>{member.username}</span>
+                      <span style={{ color: "#94a3b8", fontSize: "12px" }}>{member.email || "No email"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={memberDetailPanelStyle}>
+                {selectedMember ? (
+                  <>
+                    <div style={memberInfoGridStyle}>
+                      <InfoRow label="Member Name" value={selectedMember.username} />
+                      <InfoRow label="Email" value={selectedMember.email || "Not provided"} />
+                      <InfoRow label="Phone" value={selectedMember.phone || "Not provided"} />
+                      <InfoRow label="Room Number" value={selectedMember.roomNumber || "Not provided"} />
+                      <InfoRow label="Address" value={selectedMember.address || "Not provided"} />
+                      <InfoRow label="Status" value={selectedMember.isActive ? "Active" : "Inactive"} />
+                    </div>
+
+                    <div style={{ marginTop: "18px" }}>
+                      <h4 style={{ margin: "0 0 12px 0", color: "#f8fafc", fontSize: "16px" }}>Monthly Summary ({monthLabel})</h4>
+                      <div style={memberInfoGridStyle}>
+                        <StatCard label="Personal Meals" value={adminViewMemberMeals.toFixed(1)} suffix="units" icon={Soup} />
+                        <StatCard label="Meal Cost" value={`৳${adminViewMemberMealCost.toFixed(2)}`} icon={UtensilsCrossed} />
+                        <StatCard label="Bazar Expenses" value={`৳${adminViewMemberBazar.toFixed(2)}`} icon={ShoppingBag} />
+                        <StatCard label="Meal Rate" value={`৳${monthMealRate.toFixed(2)}`} suffix="/unit" icon={TrendingUp} />
+                        <StatCard label="Total Rent" value={`৳${totalRent.toFixed(2)}`} icon={Home} />
+                        <StatCard
+                          label="Balance"
+                          value={`${adminViewMemberBalance >= 0 ? '+' : ''}৳${Math.abs(adminViewMemberBalance).toFixed(2)}`}
+                          isHighlight={true}
+                          isBalance={adminViewMemberBalance >= 0}
+                          icon={Wallet}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <p style={{ color: "#94a3b8", margin: 0 }}>Select a member name from the list to view profile. Click the same member again to hide it.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p style={{ color: "#94a3b8", margin: 0 }}>No members found to display.</p>
+          )}
+        </div>
+      )}
+
+      {/* FINANCIAL SUMMARY FOR MEMBERS */}
+      {!isAdmin && (
+        <div style={memberInfoCardStyle}>
+          <div style={{ marginBottom: "18px" }}>
+            <h3 style={{ margin: 0, color: "#f8fafc", fontSize: "18px", fontWeight: "700" }}>Monthly Financial Summary</h3>
+            <p style={{ margin: "5px 0 0 0", color: "#94a3b8", fontSize: "14px" }}>Your financial breakdown for {monthLabel}</p>
+          </div>
+
+          <div style={memberInfoGridStyle}>
+            <StatCard label="Personal Meals" value={memberMeals.toFixed(1)} suffix="units" icon={Soup} />
+            <StatCard label="Meal Cost" value={`৳${memberMealCost.toFixed(2)}`} icon={UtensilsCrossed} />
+            <StatCard label="Bazar Expenses" value={`৳${memberBazar.toFixed(2)}`} icon={ShoppingBag} />
+            <StatCard label="Meal Rate" value={`৳${monthMealRate.toFixed(2)}`} suffix="/unit" icon={TrendingUp} />
+            <StatCard label="Total Rent" value={`৳${totalRent.toFixed(2)}`} icon={Home} />
+            <StatCard 
+              label="Your Balance" 
+              value={`${memberBalance >= 0 ? '+' : ''}৳${Math.abs(memberBalance).toFixed(2)}`}
+              isHighlight={true}
+              isBalance={memberBalance >= 0}
+              icon={Wallet}
+            />
+          </div>
+
+          <div style={{ marginTop: "20px", padding: "14px", background: "rgba(79, 70, 229, 0.1)", borderRadius: "12px", border: "1px solid rgba(79, 70, 229, 0.3)" }}>
+            <p style={{ margin: 0, color: "#cbd5e1", fontSize: "13px", lineHeight: "1.6" }}>
+              <strong style={{ color: "#f8fafc" }}>Balance Calculation:</strong> Total Rent + (Meal Cost - Bazar Expenses)
+              <br />
+              {memberBalance > 0 ? (
+                <span style={{ color: "#fca5a5" }}>You need to pay: ৳{memberBalance.toFixed(2)}</span>
+              ) : (
+                <span style={{ color: "#34d399" }}>You have a credit of: ৳{Math.abs(memberBalance).toFixed(2)}</span>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }
@@ -283,7 +547,7 @@ const profileCardStyle: React.CSSProperties = {
   padding: "32px",
   borderRadius: "26px",
   display: "flex",
-  justifyContent: "space-between",
+  justifyContent: "flex-start",
   alignItems: "center",
   marginBottom: "26px",
   flexWrap: "wrap",
@@ -293,15 +557,7 @@ const profileCardStyle: React.CSSProperties = {
   border: "1px solid rgba(255, 255, 255, 0.2)"
 };
 
-const balanceContainerStyle: React.CSSProperties = {
-  textAlign: "right",
-  minWidth: "170px",
-  background: "rgba(0, 0, 0, 0.18)",
-  padding: "14px 16px",
-  borderRadius: "14px",
-  border: "1px solid rgba(255,255,255,0.2)",
-  backdropFilter: "blur(4px)"
-};
+
 
 const avatarStyle: React.CSSProperties = {
   width: "70px",
@@ -333,72 +589,7 @@ const infoItemStyle = {
   padding: "6px 10px"
 };
 
-const activeTabStyle = {
-  padding: "10px 18px",
-  borderRadius: "12px",
-  border: "1px solid #334155",
-  backgroundColor: "#111827",
-  color: "#f8fafc",
-  fontSize: "14px",
-  fontWeight: "700",
-  cursor: "default",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)"
-};
 
-const tableContainerStyle: React.CSSProperties = {
-  background: "linear-gradient(180deg, #0f172a 0%, #0b1220 100%)",
-  padding: "30px",
-  borderRadius: "24px",
-  boxShadow: "0 24px 34px -12px rgba(2, 6, 23, 0.65)",
-  border: "1px solid #1f2937",
-  overflow: "hidden"
-};
-
-const tableHeaderRowStyle = {
-  background: "linear-gradient(90deg, #1e293b 0%, #1f2a44 100%)"
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: "left",
-  padding: "14px 12px",
-  color: "#94a3b8",
-  fontSize: "11px",
-  fontWeight: "700",
-  letterSpacing: "0.08em",
-  textTransform: "uppercase" as const,
-  borderBottom: "1px solid #273449"
-};
-
-const trStyle = {
-  borderBottom: "1px solid #1f2a3d"
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: "18px 12px",
-  color: "#cbd5e1",
-  fontSize: "14px",
-  verticalAlign: "middle"
-};
-
-const paidBadgeStyle = {
-  background: "rgba(16, 185, 129, 0.18)",
-  color: "#34d399",
-  padding: "5px 12px",
-  borderRadius: "999px",
-  border: "1px solid rgba(52, 211, 153, 0.35)",
-  fontSize: "12px",
-  fontWeight: "700"
-};
-
-const notPaidBadgeStyle = {
-  background: "rgba(239, 68, 68, 0.14)",
-  color: "#fca5a5",
-  padding: "5px 12px",
-  borderRadius: "999px",
-  border: "1px solid rgba(252, 165, 165, 0.3)",
-  fontSize: "12px",
-  fontWeight: "700"
-};
 
 const memberInfoCardStyle: React.CSSProperties = {
   background: "linear-gradient(180deg, #0f172a 0%, #0b1220 100%)",
@@ -415,11 +606,78 @@ const memberInfoGridStyle: React.CSSProperties = {
   gap: "12px"
 };
 
+const adminViewerLayoutStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(240px, 300px) 1fr",
+  gap: "16px",
+  alignItems: "start"
+};
+
+const memberListPanelStyle: React.CSSProperties = {
+  background: "linear-gradient(180deg, #111827 0%, #0f172a 100%)",
+  border: "1px solid #23314a",
+  borderRadius: "16px",
+  padding: "12px",
+  display: "grid",
+  gap: "8px",
+  maxHeight: "520px",
+  overflowY: "auto"
+};
+
+const memberDetailPanelStyle: React.CSSProperties = {
+  background: "linear-gradient(180deg, #111827 0%, #0f172a 100%)",
+  border: "1px solid #23314a",
+  borderRadius: "16px",
+  padding: "14px"
+};
+
+const memberListButtonStyle: React.CSSProperties = {
+  width: "100%",
+  textAlign: "left",
+  border: "1px solid #1f2937",
+  borderRadius: "12px",
+  background: "rgba(15, 23, 42, 0.65)",
+  padding: "10px 12px",
+  cursor: "pointer",
+  display: "grid",
+  gap: "4px"
+};
+
+const selectedMemberListButtonStyle: React.CSSProperties = {
+  ...memberListButtonStyle,
+  border: "1px solid rgba(79, 70, 229, 0.8)",
+  background: "linear-gradient(120deg, rgba(79, 70, 229, 0.32) 0%, rgba(124, 58, 237, 0.26) 100%)",
+  boxShadow: "0 0 0 1px rgba(79, 70, 229, 0.3)"
+};
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ background: "linear-gradient(180deg, #111827 0%, #0f172a 100%)", border: "1px solid #23314a", borderRadius: "16px", padding: "14px 16px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)" }}>
       <div style={{ color: "#93a4bf", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: "700", marginBottom: "8px" }}>{label}</div>
       <div style={{ color: "#f8fafc", fontSize: "15px", fontWeight: "700", lineHeight: 1.3 }}>{value}</div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, suffix = "", isHighlight = false, isBalance = true, icon: Icon }: { label: string; value: string; suffix?: string; isHighlight?: boolean; isBalance?: boolean; icon?: React.ComponentType<{ size: number; color: string }> }) {
+  return (
+    <div style={{ 
+      background: isHighlight ? "linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(124, 58, 237, 0.2))" : "linear-gradient(180deg, #111827 0%, #0f172a 100%)", 
+      border: isHighlight ? "1px solid rgba(79, 70, 229, 0.4)" : "1px solid #23314a", 
+      borderRadius: "16px", 
+      padding: "14px 16px", 
+      boxShadow: isHighlight ? "0 0 12px rgba(79, 70, 229, 0.2)" : "inset 0 1px 0 rgba(255,255,255,0.03)",
+      textAlign: "center" 
+    }}>
+      {Icon && (
+        <div style={{ marginBottom: "8px", display: "flex", justifyContent: "center" }}>
+          <Icon size={24} color={isHighlight ? (isBalance ? "#34d399" : "#fca5a5") : "#4f46e5"} />
+        </div>
+      )}
+      <div style={{ color: "#93a4bf", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: "700", marginBottom: "8px" }}>{label}</div>
+      <div style={{ color: isHighlight ? (isBalance ? "#34d399" : "#fca5a5") : "#f8fafc", fontSize: "18px", fontWeight: "700", lineHeight: 1.3 }}>
+        {value} <span style={{ fontSize: "12px", color: "#94a3b8" }}>{suffix}</span>
+      </div>
     </div>
   );
 }
