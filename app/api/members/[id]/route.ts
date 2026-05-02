@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Member from '@/lib/models/Member';
+import User from '@/lib/models/User';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -34,13 +35,25 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     await dbConnect();
     const { id } = await context.params;
 
-    const result = await Member.findByIdAndDelete(id);
-
-    if (!result) {
+    // Find the member first to get username
+    const member = await Member.findById(id);
+    if (!member) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ message: 'Member deleted successfully' });
+    const username = member.username;
+
+    // Mark member as inactive and delete from Member collection
+    await Member.findByIdAndDelete(id);
+
+    // Also mark the user as inactive so they can't log in
+    await User.findOneAndUpdate(
+      { username },
+      { isActive: false, status: 'inactive' },
+      { new: true }
+    );
+
+    return NextResponse.json({ message: 'Member removed successfully. Removed member cannot log in until re-approved by admin.' });
   } catch (error: any) {
     console.error('Error deleting member:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

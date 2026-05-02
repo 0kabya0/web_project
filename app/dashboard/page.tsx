@@ -273,20 +273,20 @@ function StatCard({ title, value, icon }: { title: string, value: string, icon: 
 
 function RulesCard() {
   const rules = [
-    "Members must pay their dues before the monthly deadline.",
-    "Meal entries cannot be edited after the day ends without valid reason.",
-    "Every member is responsible for checking their own balance regularly.",
-    "Monthly calculations will be finalized at the end of the month.",
-    "After monthly restart, previous month data cannot be changed.",
-    "Members must inform the manager before leaving the mess for multiple days.",
-    "All market expenses must include: amount, date, description.",
-    "Personal expenses cannot be added to shared mess expenses.",
-    "Missed meals will be counted as zero.",
-    "Half meals are allowed.",
-    "Maintain cleanliness in shared areas.",
-    "Respect all mess members.",
-    "Noise after quiet hours is prohibited.",
-    "Damage to mess property must be compensated.",
+    "1. Members must pay their dues before the monthly deadline.",
+    "2. Meal entries cannot be edited after the day ends without valid reason.",
+    "3. Every member is responsible for checking their own balance regularly.",
+    "4. Monthly calculations will be finalized at the end of the month.",
+    "5. After monthly restart, previous month data cannot be changed.",
+    "6. Members must inform the manager before leaving the mess for multiple days.",
+    "7. All market expenses must include: amount, date, description.",
+    "8. Personal expenses cannot be added to shared mess expenses.",
+    "9. Missed meals will be counted as zero.",
+    "10. Half meals are allowed.",
+    "11. Maintain cleanliness in shared areas.",
+    "12. Respect all mess members.",
+    "13. Noise after quiet hours is prohibited.",
+    "14. Damage to mess property must be compensated.",
   ];
 
   return (

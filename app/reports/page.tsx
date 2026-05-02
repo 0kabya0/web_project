@@ -10,7 +10,8 @@ import {
   TrendingUp, 
   Calendar, 
   Scale,
-  Download
+  Download,
+  FileText
 } from "lucide-react";
 import { useGlobalStats } from "@/hooks/useGlobalStats";
 

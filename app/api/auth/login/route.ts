@@ -29,8 +29,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
+    if (user.status === 'inactive' || user.isActive === false) {
+      return NextResponse.json({ 
+        error: 'Your account has been removed from the mess. Please contact admin or sign up again.' 
+      }, { status: 403 });
+    }
+
     if (user.status !== 'approved') {
-      return NextResponse.json({ error: 'Account pending approval' }, { status: 403 });
+      return NextResponse.json({ error: 'Account pending approval. Please wait for admin approval.' }, { status: 403 });
     }
 
     return NextResponse.json({

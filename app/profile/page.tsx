@@ -316,6 +316,19 @@ export default function ProfilePage() {
 
   return (
     <div style={{ animation: "fadeIn 0.5s", paddingBottom: "40px", width: "100%", boxSizing: "border-box", paddingRight: "10px" }}>
+      <style>{`
+        @keyframes floatBtn {
+          0% { transform: translateY(0px); }
+          100% { transform: translateY(-8px); }
+        }
+        .move-card:hover {
+          animation: floatBtn 0.3s ease forwards;
+          box-shadow: 0 20px 40px rgba(59, 130, 246, 0.2);
+          border: 1px solid rgba(59, 130, 246, 0.5) !important;
+          cursor: pointer;
+        }
+      `}</style>
+
       {/* HEADER SECTION */}
       <header style={{ marginBottom: "25px" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold", margin: 0, color: "#ffffff" }}>
@@ -357,6 +370,7 @@ export default function ProfilePage() {
           {!isAdmin && !isEditing && (
             <button 
               onClick={() => setIsEditing(true)}
+              className="move-card"
               style={editButtonStyle}
             >
               <Edit2 size={16} /> Edit
@@ -402,12 +416,14 @@ export default function ProfilePage() {
               <button 
                 onClick={handleEditMember}
                 disabled={isSaving}
+                className="move-card"
                 style={saveButtonStyle}
               >
                 <Save size={16} /> {isSaving ? 'Saving...' : 'Save'}
               </button>
               <button 
                 onClick={() => setIsEditing(false)}
+                className="move-card"
                 style={cancelButtonStyle}
               >
                 <X size={16} /> Cancel
@@ -447,6 +463,7 @@ export default function ProfilePage() {
                     <button
                       key={member._id}
                       type="button"
+                      className="move-card"
                       onClick={() => setSelectedMemberId((prev) => (prev === member._id ? "" : member._id))}
                       style={isSelected ? selectedMemberListButtonStyle : memberListButtonStyle}
                     >
@@ -652,7 +669,7 @@ const selectedMemberListButtonStyle: React.CSSProperties = {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ background: "linear-gradient(180deg, #111827 0%, #0f172a 100%)", border: "1px solid #23314a", borderRadius: "16px", padding: "14px 16px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)" }}>
+    <div className="move-card" style={{ background: "linear-gradient(180deg, #111827 0%, #0f172a 100%)", border: "1px solid #23314a", borderRadius: "16px", padding: "14px 16px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)" }}>
       <div style={{ color: "#93a4bf", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: "700", marginBottom: "8px" }}>{label}</div>
       <div style={{ color: "#f8fafc", fontSize: "15px", fontWeight: "700", lineHeight: 1.3 }}>{value}</div>
     </div>
@@ -661,7 +678,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function StatCard({ label, value, suffix = "", isHighlight = false, isBalance = true, icon: Icon }: { label: string; value: string; suffix?: string; isHighlight?: boolean; isBalance?: boolean; icon?: React.ComponentType<{ size: number; color: string }> }) {
   return (
-    <div style={{ 
+    <div className="move-card" style={{ 
       background: isHighlight ? "linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(124, 58, 237, 0.2))" : "linear-gradient(180deg, #111827 0%, #0f172a 100%)", 
       border: isHighlight ? "1px solid rgba(79, 70, 229, 0.4)" : "1px solid #23314a", 
       borderRadius: "16px", 
