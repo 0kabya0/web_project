@@ -125,8 +125,8 @@ html { font-size: var(--app-font-size, 16px); }
 /* Layout-specific responsive tweaks for the app shell */
 .app-root .sidebar { transition: all 0.2s ease; }
 @media (max-width: 1023px) {
-  /* Hide sidebar on tablet and smaller, allow full-width main content */
-  .app-root .sidebar { display: none !important; }
+  /* On tablet and smaller, sidebar will be controlled by JS toggle (do not force hide with !important) */
+  .app-root .sidebar { /* visibility controlled via AppShell */ }
   .app-root .container { padding-left: var(--space-md); padding-right: var(--space-md); }
   .app-root .topRightActions { right: var(--space-md); top: var(--space-sm); }
 }
@@ -134,5 +134,167 @@ html { font-size: var(--app-font-size, 16px); }
 @media (max-width: 639px) {
   .app-root .topRightActions { right: var(--space-sm); top: var(--space-sm); }
   .app-root .username { display: none; }
+}
+
+/* Mobile-specific grid fixes for forms and modals */
+@media (max-width: 768px) {
+  /* Manage Mess tabs: render Meals/Bazar/Payments/Rent as a 2x2 mobile grid */
+  .manage-tab-bar {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+  }
+
+  .manage-tab-bar button {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px 12px !important;
+    border-radius: 12px !important;
+    font-size: 13px !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    text-align: center !important;
+    line-height: 1.1 !important;
+  }
+
+  /* Meals page stats: force a 2x2 grid on mobile like summary boxes */
+  .meals-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  .meals-stats-grid > div {
+    min-width: 0;
+  }
+
+  /* Rent inputs: force single column on mobile/tablet */
+  .rent-input-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Meal inputs: maintain 2 columns on mobile */
+  .meal-input-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    align-items: stretch;
+  }
+
+  .meal-input-grid > div {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .meal-input-grid input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Reports section header: stack button below on mobile */
+  .report-header-action {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .report-header-action > div:first-child {
+    width: 100%;
+  }
+
+  .report-header-action button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Dashboard balance card mobile adjustments */
+  .balance-card {
+    padding: 18px !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .balance-card-inner {
+    display: flex !important;
+    gap: 16px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .balance-card .total-paid-amount {
+    font-size: 22px !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+    line-height: 1.1 !important;
+  }
+
+  /* Ensure the rent amount also scales down on small screens */
+  .balance-card .total-rent-amount {
+    font-size: 28px !important;
+  }
+
+  /* Arrow action icon placement on mobile */
+  .balance-action-icon {
+    align-self: flex-end !important;
+    margin-top: 12px !important;
+    padding: 10px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 16px rgba(99, 102, 241, 0.18) !important;
+  }
+
+  /* Reports tab bar: make report tabs render as 2x2 on mobile and allow label wrapping */
+  .reports-tab-bar {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+    padding: 6px !important;
+    border-radius: 12px !important;
+    background: transparent !important;
+  }
+
+  .reports-tab-bar button {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px 12px !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    text-align: center !important;
+    line-height: 1.1 !important;
+  }
+
+  /* Monthly Summary card: ensure it fits on small screens and stack summary cells */
+  .monthly-summary-card {
+    max-width: 100% !important;
+    padding: 18px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .monthly-summary-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Stack summary items into single column on narrow widths to avoid overflow */
+  @media (max-width: 420px) {
+    .monthly-summary-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
 }
 

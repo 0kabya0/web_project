@@ -189,6 +189,8 @@ export default function ReportsPage() {
 
   const formatCurrency = (value: number) => `৳${value.toFixed(2)}`;
   const formatAmount = (value: number) => `৳${value.toFixed(0)}`;
+  const formatCurrencyPDF = (value: number) => `Tk ${value.toFixed(2)}`;
+  const formatAmountPDF = (value: number) => `Tk ${value.toFixed(0)}`;
   const getMonthKey = (value?: string | null) => (value ? value.slice(0, 7) : "");
   const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString() : "-");
 
@@ -319,15 +321,15 @@ export default function ReportsPage() {
         head: [["Metric", "Value"]],
         body: [
           ["Total Meals", monthMealTotal.toFixed(1)],
-          ["Total Bazar", formatAmount(monthBazarTotal)],
-          ["Total Payments", formatCurrency(totalPaidBalance)],
-          ["Meal Rate", formatCurrency(monthMealRate)],
-          ["Total Balance", formatCurrency(monthBalance)],
+          ["Total Bazar", formatAmountPDF(monthBazarTotal)],
+          ["Total Payments", formatCurrencyPDF(totalPaidBalance)],
+          ["Meal Rate", formatCurrencyPDF(Number(monthMealRate))],
+          ["Total Balance", formatCurrencyPDF(monthBalance)],
           ["Total Members", String(stats.totalMembers)],
         ],
-        styles: { fontSize: 10 },
-        headStyles: { fillColor: [30, 41, 59] },
-        alternateRowStyles: { fillColor: [241, 245, 249] },
+        styles: { fontSize: 10, textColor: [0, 0, 0] },
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0] },
       });
     }
 
@@ -338,13 +340,13 @@ export default function ReportsPage() {
         body: balanceSheetRows.map((row) => [
           row.member.username,
           row.meals.toFixed(1),
-          formatCurrency(row.mealCost),
-          row.isPaid ? "✔" : "✘",
-          formatCurrency(row.balance),
+          formatCurrencyPDF(row.mealCost),
+          row.isPaid ? "Yes" : "No",
+          formatCurrencyPDF(row.balance),
         ]),
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [30, 41, 59] },
-        alternateRowStyles: { fillColor: [241, 245, 249] },
+        styles: { fontSize: 9, textColor: [0, 0, 0] },
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0] },
       });
     }
 
@@ -364,30 +366,28 @@ export default function ReportsPage() {
             String(meal.total || 0),
           ];
         }),
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [30, 41, 59] },
-        alternateRowStyles: { fillColor: [241, 245, 249] },
+        styles: { fontSize: 9, textColor: [0, 0, 0] },
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0] },
       });
     }
 
     if (activeTab === "Bazar") {
       autoTable(doc, {
         startY: 40,
-        head: [["Purchased By", "Date", "Item", "Qty", "Unit", "Amount"]],
+        head: [["Purchased By", "Date", "Item", "Amount"]],
         body: monthBazars.map((entry) => {
           const member = getRecordMember(entry.memberId);
           return [
             member.username,
             formatDate(entry.date),
             entry.item,
-            String(entry.quantity || 0),
-            entry.unit,
-            formatCurrency(entry.total ?? entry.quantity * entry.price),
+            formatCurrencyPDF(entry.total ?? entry.quantity * entry.price),
           ];
         }),
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [30, 41, 59] },
-        alternateRowStyles: { fillColor: [241, 245, 249] },
+        styles: { fontSize: 9, textColor: [0, 0, 0] },
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0] },
       });
     }
 
@@ -399,14 +399,14 @@ export default function ReportsPage() {
     switch (activeTab) {
       case "Monthly Summary":
         return (
-          <div style={innerSummaryCardStyle}>
+          <div style={innerSummaryCardStyle} className="monthly-summary-card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px", gap: "12px" }}>
               <div>
                 <h4 style={{ margin: 0, fontSize: "16px", color: "#94a3b8", fontWeight: "600" }}>Current Period</h4>
               </div>
               <div style={statusBadgeStyle}>{formatCurrency(monthBalance)}</div>
             </div>
-            <div style={innerGridStyle}>
+            <div style={innerGridStyle} className="monthly-summary-grid">
               <SummaryItem label="Total Meals" value={monthMealTotal.toFixed(1)} icon={<UtensilsCrossed size={16} color="#22c55e" />} bgColor="rgba(34, 197, 94, 0.1)" />
               <SummaryItem label="Total Bazar" value={formatAmount(monthBazarTotal)} icon={<ShoppingCart size={16} color="#eab308" />} bgColor="rgba(234, 179, 8, 0.1)" />
               <SummaryItem label="Total Payments" value={formatCurrency(totalPaidBalance)} icon={<Wallet size={16} color="#6366f1" />} bgColor="rgba(99, 102, 241, 0.1)" />
@@ -420,7 +420,7 @@ export default function ReportsPage() {
       case "Balance Sheet":
         return (
           <div style={tableWrapperStyle}>
-            <div style={tableHeaderActionStyle}>
+            <div style={tableHeaderActionStyle} className="report-header-action">
               <div>
                 <h3 style={tableTitleStyle}>Member Balance Sheet</h3>
                 <p style={{ margin: "6px 0 0 0", color: "#94a3b8", fontSize: "13px" }}>{selectedMonthLabel}</p>
@@ -465,7 +465,7 @@ export default function ReportsPage() {
       case "Meals":
         return (
           <div style={tableWrapperStyle}>
-            <div style={tableHeaderActionStyle}>
+            <div style={tableHeaderActionStyle} className="report-header-action">
               <div>
                 <h3 style={tableTitleStyle}>Daily Meal Records</h3>
                 <p style={{ margin: "6px 0 0 0", color: "#94a3b8", fontSize: "13px" }}>{selectedMonthLabel}</p>
@@ -517,7 +517,7 @@ export default function ReportsPage() {
       case "Bazar":
         return (
           <div style={tableWrapperStyle}>
-            <div style={tableHeaderActionStyle}>
+            <div style={tableHeaderActionStyle} className="report-header-action">
               <div>
                 <h3 style={tableTitleStyle}>Bazar Expenditure</h3>
                 <p style={{ margin: "6px 0 0 0", color: "#94a3b8", fontSize: "13px" }}>{selectedMonthLabel}</p>
@@ -533,8 +533,6 @@ export default function ReportsPage() {
                     <th style={thStyle}>Purchased By</th>
                     <th style={thStyle}>Date</th>
                     <th style={thStyle}>Item</th>
-                    <th style={thStyle}>Qty</th>
-                    <th style={thStyle}>Unit</th>
                     <th style={{ ...thStyle, textAlign: "right" }}>Amount</th>
                   </tr>
                 </thead>
@@ -548,15 +546,13 @@ export default function ReportsPage() {
                           <td style={reportTdStyle}>{member.username}</td>
                           <td style={reportTdStyle}>{formatDate(entry.date)}</td>
                           <td style={reportTdStyle}>{entry.item}</td>
-                          <td style={reportTdStyle}>{entry.quantity}</td>
-                          <td style={reportTdStyle}>{entry.unit}</td>
                           <td style={{ ...reportTdStyle, textAlign: "right", fontWeight: "700" }}>{formatAmount(amount)}</td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan={6} style={emptyTdStyle}>No records found for this term.</td>
+                      <td colSpan={4} style={emptyTdStyle}>No records found for this term.</td>
                     </tr>
                   )}
                 </tbody>
@@ -614,7 +610,7 @@ export default function ReportsPage() {
       </div>
 
       {/* NAVIGATION TABS */}
-      <div style={tabContainerStyle}>
+      <div style={tabContainerStyle} className="reports-tab-bar">
         <TabButton title="Monthly Summary" icon={<BarChart3 size={16} />} active={activeTab} setter={setActiveTab} />
         <TabButton title="Balance Sheet" icon={<Scale size={16} />} active={activeTab} setter={setActiveTab} />
         <TabButton title="Meals" icon={<UtensilsCrossed size={16} />} active={activeTab} setter={setActiveTab} />

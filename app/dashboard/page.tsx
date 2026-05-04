@@ -205,12 +205,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={styles.balanceCard} className="move-card">
+        <div style={styles.balanceCard} className="move-card balance-card">
           <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", gap: "80px" }}>
+            <div style={{ display: "flex", gap: "80px" }} className="balance-card-inner">
               <div>
                 <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Total Rent</p>
-                <h2 style={{ fontSize: "36px", fontWeight: "bold", margin: "8px 0", color: "#f8fafc" }}>
+                <h2 className="total-rent-amount" style={{ fontSize: "36px", fontWeight: "bold", margin: "8px 0", color: "#f8fafc" }}>
                   ৳{totalRent.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </h2>
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -220,9 +220,9 @@ export default function Dashboard() {
                 </div>
               </div>
               {userData.role === "admin" ? (
-                <div>
+                <div className="total-paid-block">
                   <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Total Paid</p>
-                  <h2 style={{ fontSize: "36px", fontWeight: "bold", margin: "8px 0", color: "#10b981" }}>
+                  <h2 className="total-paid-amount" style={{ fontSize: "36px", fontWeight: "bold", margin: "8px 0", color: "#10b981" }}>
                     ৳{myPaid.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </h2>
                 </div>
@@ -240,7 +240,7 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div style={styles.balanceActionIcon}>
+          <div style={styles.balanceActionIcon} className="balance-action-icon">
             <ArrowUpRight size={28} color="#fff" />
           </div>
         </div>

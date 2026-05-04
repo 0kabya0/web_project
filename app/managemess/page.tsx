@@ -510,10 +510,10 @@ export default function ManageMess() {
 
   // --- 8. CALCULATE STATS ---
   const stats = [
-    { title: "Total Meals Today", value: totalMealsToday.toFixed(1), icon: <Utensils color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
+    { title: "Total Meals Today", value: totalMealsToday.toFixed(1), subtitle: `${todaysMeals.length} records`, icon: <Utensils color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
     { title: "Total Bazar Today", value: `৳${totalBazarToday.toFixed(0)}`, icon: <ShoppingCart color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
     { title: "Total Members", value: globalStats.totalMembers, icon: <UserIcon color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
-    { title: "All-Time Meals", value: globalStats.totalMeals.toFixed(1), icon: <Utensils color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
+    { title: "All-Time Meals", value: globalStats.totalMeals.toFixed(1), subtitle: meals.length > 0 ? `${(globalStats.totalMeals / meals.length).toFixed(2)} avg/record` : "0 avg/record", icon: <Utensils color="#fff" />, color: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" },
   ];
 
   if (loading) {
@@ -544,6 +544,7 @@ export default function ManageMess() {
             <div>
               <p style={styles.statLabelLight}>{stat.title}</p>
               <h2 style={styles.statValue}>{stat.value}</h2>
+              {stat.subtitle && <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>{stat.subtitle}</p>}
             </div>
             <div style={styles.iconBoxGlass}>{stat.icon}</div>
           </div>
@@ -551,7 +552,7 @@ export default function ManageMess() {
       </div>
 
       {/* TAB NAVIGATION */}
-      <div style={styles.tabBar}>
+      <div style={styles.tabBar} className="manage-tab-bar">
         {["Meals", "Bazar", "Payments", "Rent"].map((tab) => (
           <button
             key={tab}
@@ -812,12 +813,6 @@ export default function ManageMess() {
                           {monthlyPaymentByMember[row.member._id] ? (
                             <>
                               <button
-                                style={styles.btnEditPayment}
-                                onClick={() => handleEditMonthlyPayment(monthlyPaymentByMember[row.member._id])}
-                              >
-                                <Edit3 size={14} /> Edit
-                              </button>
-                              <button
                                 style={styles.btnCancelPayment}
                                 onClick={() => handleCancelMonthlyPayment(monthlyPaymentByMember[row.member._id])}
                               >
@@ -849,7 +844,7 @@ export default function ManageMess() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "20px" }} className="rent-input-grid">
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Room Rent</label>
                 <input
@@ -947,7 +942,7 @@ export default function ManageMess() {
                 />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }} className="meal-input-grid">
                 <div style={styles.inputGroup}>
                   <label style={styles.label}>Breakfast</label>
                   <input
@@ -970,17 +965,17 @@ export default function ManageMess() {
                     style={styles.input}
                   />
                 </div>
-              </div>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Dinner</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={mealForm.dinner}
-                  onChange={(e) => setMealForm({ ...mealForm, dinner: parseFloat(e.target.value) || 0 })}
-                  style={styles.input}
-                />
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Dinner</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={mealForm.dinner}
+                    onChange={(e) => setMealForm({ ...mealForm, dinner: parseFloat(e.target.value) || 0 })}
+                    style={styles.input}
+                  />
+                </div>
               </div>
             </div>
             <div style={styles.modalFooter}>
@@ -1108,7 +1103,7 @@ const styles: { [key: string]: React.CSSProperties } = {
 
   /* MODAL STYLES */
   modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.7)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000, backdropFilter: "blur(4px)" },
-  modalContent: { background: "#0f172a", border: "1px solid #1e293b", borderRadius: "20px", width: "90%", maxWidth: "500px", color: "#f8fafc", overflow: "hidden" },
+  modalContent: { background: "#0f172a", border: "1px solid #1e293b", borderRadius: "20px", width: "95%", maxWidth: "600px", color: "#f8fafc", overflow: "hidden" },
   modalHeader: { padding: "20px", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" },
   modalTitle: { margin: 0, fontSize: "18px", fontWeight: "700", color: "#f8fafc" },
   btnCloseModal: { background: "transparent", border: "none", color: "#64748b", cursor: "pointer" },

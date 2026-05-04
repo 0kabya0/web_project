@@ -5,12 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, ClipboardList, Utensils, ShoppingCart, 
   Wallet, User, FileText, LogOut, ChevronDown,
-  Users, Settings
+  Users, Settings, X
 } from "lucide-react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [userData, setUserData] = useState<{ username: string; role?: string }>({ username: "Guest" });
 
@@ -25,6 +27,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       });
     }
   }, [pathname]);
+
+  // Detect mobile / small screens and close sidebar by default on mobile
+  useEffect(() => {
+    function onResize() {
+      const mobile = typeof window !== 'undefined' && window.innerWidth <= 1023;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(false); // ensure desktop shows sidebar via styles
+    }
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const isLoginPage = pathname === "/" || pathname === "" || pathname?.includes('/login');
 
@@ -75,7 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       `}</style>
 
       {!isLoginPage && (
-        <aside style={styles.sidebar} className="sidebar">
+        <aside style={{ ...styles.sidebar, ...(isMobile ? styles.sidebarMobile : {}), display: isMobile ? (sidebarOpen ? 'flex' : 'none') : 'flex' }} className="sidebar">
           <div style={styles.logoSection}>
             <div style={styles.logoIcon}>🏠</div>
             <h2 style={styles.logoText}>MESS MASTER</h2>
@@ -84,7 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {filteredSidebarItems.map((item, index) => {
               const isActive = pathname === item.href;
               return (
-                <Link href={item.href} key={index} style={{ textDecoration: 'none' }}>
+                <Link href={item.href} key={index} style={{ textDecoration: 'none' }} onClick={() => { if (isMobile) setSidebarOpen(false); }}>
                   <div style={isActive ? styles.navItemActive : styles.navItem} className="move-card">
                     {item.icon} <span>{item.label}</span>
                   </div>
@@ -93,6 +107,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
         </aside>
+      )}
+
+      {/* Hamburger Toggle for mobile */}
+      {!isLoginPage && isMobile && (
+        <>
+          <button
+            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={{ ...styles.hamburgerBtn, display: sidebarOpen ? 'none' : 'flex' }}
+            className="hamburger-btn"
+          >
+            <div style={styles.hamburgerLines} />
+          </button>
+
+          {/* Backdrop to close sidebar when open on mobile */}
+          {sidebarOpen && <div style={styles.backdrop} onClick={() => setSidebarOpen(false)} />}
+        </>
       )}
 
       <main style={{ 
@@ -147,13 +178,13 @@ const styles: { [key: string]: React.CSSProperties } = {
     overflow: "hidden" 
   },
   sidebar: { 
-    width: "260px", 
+    width: "260px",
     minWidth: "260px",
-    background: "rgba(255, 255, 255, 0.03)", 
-    borderRight: "1px solid rgba(255,255,255,0.1)", 
-    display: "flex", 
-    flexDirection: "column", 
-    padding: "20px" 
+    background: "rgba(255, 255, 255, 0.03)",
+    borderRight: "1px solid rgba(255,255,255,0.1)",
+    flexDirection: "column",
+    padding: "20px",
+    boxSizing: "border-box"
   },
   logoSection: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "40px", padding: "10px" },
   logoIcon: { background: "#3b82f6", width: "32px", height: "32px", borderRadius: "8px", display: "flex", justifyContent: "center", alignItems: "center" },
@@ -181,6 +212,53 @@ const styles: { [key: string]: React.CSSProperties } = {
     top: "30px",
     right: "40px",
     zIndex: 100,
+  },
+
+  hamburgerBtn: {
+    position: 'fixed',
+    top: 12,
+    left: 12,
+    zIndex: 220,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    background: 'transparent',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: 'none'
+  },
+  hamburgerLines: {
+    width: 18,
+    height: 2,
+    background: '#a855f7',
+    boxShadow: '0 6px 0 0 #a855f7, 0 -6px 0 0 #a855f7',
+    borderRadius: 2,
+  },
+
+  // backdrop behind mobile sidebar
+  backdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.5)',
+    zIndex: 160,
+  },
+
+  // mobile-specific sidebar overrides
+  sidebarMobile: {
+    position: 'fixed',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '260px',
+    maxWidth: '80%',
+    transform: 'translateX(0)',
+    zIndex: 170,
+    boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+    borderRight: '1px solid rgba(255,255,255,0.06)',
+    background: 'linear-gradient(180deg, rgba(2,6,23,0.95), rgba(2,6,23,0.98))',
   },
   userDropdownTrigger: {
     display: "flex",

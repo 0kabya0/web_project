@@ -196,7 +196,7 @@ export default function MealsPage() {
 
 
       {/* STAT CARDS */}
-      <div style={statsGridStyle}>
+      <div style={statsGridStyle} className="meals-stats-grid">
         <div style={statCardGradientStyle}>
           <div>
             <p style={statLabelStyle}>Total Meals</p>
